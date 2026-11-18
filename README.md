@@ -1,6 +1,15 @@
 # TestPilot
 智测领航 TestPilot：面向基础开发者的智能软件测试平台，2026秋软件工程实践团队项目。
 
+项目分为后端（FastAPI + SQLite）与前端（Vue 3 + TypeScript + Element Plus）。以下命令均在仓库根目录运行。
+
+## 目录
+
+- `backend/` — FastAPI + SQLite 后端：项目/需求/接口/环境、用例与预检、确定性执行、HTML 报告、Agent 接入。
+- `frontend/` — Vue 3 + TypeScript + Element Plus 前端；环境、执行与结果页见 [frontend/README.md](frontend/README.md)。
+- `demo_service/` — 本地演示服务，见 [demo_service/README.md](demo_service/README.md)。
+- `docs/` — 接口约定与验收证据。
+
 本分支交付曾炜毅负责的 **后端：项目基础与数据（FR-01、02、03 的 Alpha 约定部分）**。
 项目、需求、接口登记、环境配置可独立运行；已接入主分支现有的需求澄清模块，使用真实需求数据库读取原文。
 本分支新增用例管理、统一预检、人工确认、变更复核、人工检查记录和HTML报告，并将真实执行器接入公共入口。基础数据→保存/确认用例→执行→下载报告已通过真实本机HTTP验证；前端和Agent生成接口仍需团队联调。用例格式、启动与验收步骤见[沈冠宇模块交付说明](backend/app/modules/cases/README.md)。需求澄清的真实模型配置见 [Agent说明](backend/app/modules/agent/README.md)，未配置密钥时该接口返回502，基础数据接口仍可用。
@@ -28,6 +37,18 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r backend/requirements.txt
 .venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ```
+
+## 启动前端
+
+前端默认使用内置 Mock，可在后端未启动时独立演示；联调时设置 `VITE_USE_MOCK=false` 经 Vite 开发代理访问 `http://127.0.0.1:8000`。
+
+```powershell
+cd frontend
+npm install
+npm run dev   # http://127.0.0.1:5173
+```
+
+构建与类型检查：`npm run build`、`npm run typecheck`。详见 [frontend/README.md](frontend/README.md)。
 
 ## 创建项目、需求和两个接口
 
@@ -69,6 +90,7 @@ Invoke-RestMethod -Uri "$p/environment"
 - [Alpha v1 接口约定](docs/api-alpha.md)：路径、字段、状态码和全组约定。
 - [数据库及模块接入说明](docs/backend-integration.md)：共享连接、事务、项目校验、版本查询、Agent 和执行器适配。
 - [个人交付说明](docs/曾炜毅-后端交付说明.md)：职责、验证结果、站会演示、待联调项。
+- [前端交付说明](frontend/README.md)：环境、执行与结果页的启动、Mock 切换与验证。
 
 前端通过 `/api` 请求；Vite 开发代理指向 `http://127.0.0.1:8000`。
 演示服务另行运行，见 [演示服务说明](demo_service/README.md)。执行目标配置为服务端环境变量 `DEMO_BASE_URL`，默认 `http://127.0.0.1:8010`；公开 API 只接受 `target: "demo"`。

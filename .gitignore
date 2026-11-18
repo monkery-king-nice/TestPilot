@@ -222,6 +222,26 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# ---- Node / 前端 (Vue 3 + Vite) ----
+node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+
+# ---- 本地缓存 / 临时目录 ----
+.npm-cache/
+.npm-logs/
+.tmp/
+
+# ---- 团队任务说明包（本地开发材料，不入库）----
+/TestPilot-Alpha-六人开发包/
+
 # TestPilot local data and private configuration
 .env.*
 !.env.example
