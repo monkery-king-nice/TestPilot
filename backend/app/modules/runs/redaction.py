@@ -1,7 +1,8 @@
 """Redact before any request/response evidence reaches SQLite."""
 
 import json
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 REDACTED = "[REDACTED]"
 _SENSITIVE_PARTS = (
@@ -20,6 +21,10 @@ _SENSITIVE_PARTS = (
 def _sensitive_key(key: Any) -> bool:
     normalized = str(key).lower().replace("-", "_")
     return any(part in normalized for part in _SENSITIVE_PARTS)
+
+
+def is_sensitive_path(path: str | None) -> bool:
+    return bool(path) and any(_sensitive_key(key) for key in path.split("."))
 
 
 def redact_structure(value: Any, secrets: Iterable[str] = ()) -> Any:

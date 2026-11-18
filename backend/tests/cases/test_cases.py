@@ -1,6 +1,8 @@
 import copy
 import json
+from html import unescape
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,6 +11,55 @@ from backend.app.modules.runs.dependencies import PreflightRejected
 from backend.app.modules.runs.models import CaseRef
 
 from .conftest import create_context, run_cases, save
+
+
+def test_download_masks_sensitive_assertion_values_in_new_and_historical_runs(client):
+    base, draft = create_context(client)
+    marker = "FICTIONAL_PRIVATE_MARKER"
+    service = client.app.state.run_service
+    service.transport = httpx.MockTransport(lambda request: httpx.Response(200, json={
+        "token": f"{marker}_ACTUAL_TOKEN",
+        "auth": {"password": f"{marker}_ACTUAL_PASSWORD"},
+        "user": {"id": "ordinary-actual-id"},
+    }))
+    step = draft["steps"][1]
+    step["headers"] = {}
+    step["assertions"] = [
+        {"type": "json_equals", "path": "token", "expected": f"{marker}_EXPECTED_TOKEN"},
+        {"type": "json_equals", "path": "auth.password",
+         "expected": f"{marker}_EXPECTED_PASSWORD"},
+        {"type": "json_equals", "path": "user.id", "expected": "ordinary-expected-id"},
+    ]
+    draft["steps"] = [step]
+    case = save(client, base, draft, confirm=True)
+    run_id, result = run_cases(client, base, [case])
+    assert result["counts"]["FAIL"] == 1
+    report_url = base + f"/runs/{run_id}/report"
+
+    def assert_safe_download():
+        response = client.get(report_url)
+        assert response.status_code == 200
+        assert "attachment" in response.headers["content-disposition"]
+        html = unescape(response.text)
+        assert marker not in html
+        for path in ("token", "auth.password"):
+            assert f'"path": "{path}"' in html
+            assert f"{path}：期望 [REDACTED]，实际 [REDACTED]" in html
+        assert html.count('"expected": "[REDACTED]"') == 2
+        assert "user.id：期望 'ordinary-expected-id'，实际 'ordinary-actual-id'" in html
+
+    assert_safe_download()
+    assert marker not in json.dumps(result)
+
+    # Reproduce the evidence format persisted before path-aware redaction.
+    project_id = base.rsplit("/", 1)[1]
+    stored_result = service.get_run(project_id, run_id).results[0]
+    stored_result.steps[0].assertion_diffs[:2] = [
+        f"token：期望 '{marker}_EXPECTED_TOKEN'，实际 '{marker}_ACTUAL_TOKEN'",
+        f"auth.password：期望 '{marker}_EXPECTED_PASSWORD'，实际 '{marker}_ACTUAL_PASSWORD'",
+    ]
+    service.repository.save_case_result(run_id, stored_result)
+    assert_safe_download()
 
 
 def test_saved_case_survives_restart_and_edit_requires_new_confirmation(settings):

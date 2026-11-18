@@ -5,7 +5,7 @@ from html import escape
 
 from fastapi import HTTPException
 
-from ..runs.redaction import redact_structure
+from ..runs.redaction import REDACTED, is_sensitive_path, redact_structure
 from ..runs.service import RunService
 
 
@@ -15,6 +15,22 @@ def text(value) -> str:
 
 def block(value) -> str:
     return "<pre>" + text(json.dumps(value, ensure_ascii=False, indent=2)) + "</pre>"
+
+
+def redact_assertions(assertions: list[dict]) -> list[dict]:
+    safe = redact_structure(assertions)
+    for assertion in safe:
+        if "expected" in assertion and is_sensitive_path(assertion.get("path")):
+            assertion["expected"] = REDACTED
+    return safe
+
+
+def redact_saved_diff(diff: str) -> str:
+    # Older batches stored JSON equality differences as "path：期望 value，实际 value".
+    path, separator, _ = diff.partition("：期望 ")
+    if separator and is_sensitive_path(path):
+        return f"{path}：期望 {REDACTED}，实际 {REDACTED}"
+    return diff
 
 
 class ReportService:
@@ -81,12 +97,14 @@ class ReportService:
                     f'<br>HTTP 状态：{text(actual.get("http_status"))}'
                     f' · 耗时：{text(actual.get("elapsed_ms"))} ms'
                     f'<br>错误阶段：{text(actual.get("error_stage"))}</p>',
-                    '<p>冻结的断言：</p>' + block(redact_structure(step["assertions"])),
+                    '<p>冻结的断言：</p>' + block(redact_assertions(step["assertions"])),
                     '<p>请求摘要（已脱敏）：</p><pre>'
                     + text(actual.get("request_summary")) + '</pre>',
                     '<p>响应摘要（已脱敏）：</p><pre>'
                     + text(actual.get("response_summary")) + '</pre>',
-                    '<p>断言差异：</p>' + block(actual.get("assertion_diffs", [])),
+                    '<p>断言差异：</p>' + block([
+                        redact_saved_diff(diff) for diff in actual.get("assertion_diffs", [])
+                    ]),
                 ])
             parts.append('</section>')
         parts.append('<p>本报告读取执行器保存的快照和证据；当前需求与用例的后续修改不会改写本报告。</p>'
