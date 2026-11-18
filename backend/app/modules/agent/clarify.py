@@ -37,9 +37,14 @@ def result(text, payload):
 
 
 def ask_model(text):
-    url = os.getenv("TESTPILOT_MODEL_URL", "")
-    model = os.getenv("TESTPILOT_MODEL", "")
+    official_url = "https://api.deepseek.com/chat/completions"
+    url = os.getenv("TESTPILOT_MODEL_URL", official_url)
+    model = os.getenv("TESTPILOT_MODEL", "deepseek-flash" if url == official_url else "")
     key = os.getenv("TESTPILOT_MODEL_KEY", "")
+    if url == official_url:
+        key = os.getenv("DEEPSEEK_API_KEY") or key
+        if not key:
+            raise ModelError("请在本机设置 DEEPSEEK_API_KEY 后重试")
     target = urlsplit(url)
     if not model or not target.hostname or not (
         target.scheme == "https" or

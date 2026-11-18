@@ -26,6 +26,15 @@ req-1 的原文为“登录后显示我的信息”，样例返回 NEEDS_INFO �
 
 ## 郭泽强：真实模型验证
 
+团队默认使用 DeepSeek 官方接口和 deepseek-flash。只需为当前 PowerShell 会话设置密钥，在仓库根目录运行：
+
+```powershell
+$env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host '输入 DeepSeek API Key' -AsSecureString)).Password
+python -m backend.app.modules.agent.demo --live --text "登录后显示我的信息"
+```
+
+此命令会将这一句需求发送给 DeepSeek，打印真实回答。运行两组内置需求时省略 --text 及其参数。关闭终端后需重新设置会话密钥。[DeepSeek 官方接口说明](https://api-docs.deepseek.com/)
+
 正常后端默认调用真实模型。配置 TESTPILOT_MODEL_URL（完整的 Chat Completions 兼容端点）、TESTPILOT_MODEL（团队选定的模型名），需鉴权时在本机设置 TESTPILOT_MODEL_KEY。只传需求正文，不传环境里的演示凭证。不要把密钥写入仓库。
 
 ```powershell
