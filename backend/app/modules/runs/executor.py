@@ -11,7 +11,7 @@ from .models import CaseResult, StepResult
 from .redaction import evidence_summary, redact_structure, replace_secrets
 
 _TEMPLATE = re.compile(r"\{\{(env|steps)\.([A-Za-z0-9_.-]+)\}\}")
-_FULL_TEMPLATE = re.compile(r"^\{\{(env|steps)\.([A-Za-z0-9_.-]+)\}$}")
+_FULL_TEMPLATE = re.compile(r"^\{\{(env|steps)\.([A-Za-z0-9_.-]+)\}\}$")
 _MISSING = object()
 
 

@@ -105,3 +105,53 @@ def test_only_one_active_batch_is_allowed(service_factory):
         service.wait_for_idle()
         detail = client.get(f"/api/projects/project-1/runs/{first.json()['run_id']}").json()
         assert detail["counts"]["PASS"] == 1
+
+
+def test_full_field_templates_preserve_scalar_types(service_factory):
+    import json
+
+    captured = []
+
+    def typed_values(request):
+        if request.url.path == "/auth/login":
+            return httpx.Response(
+                200, json={"id": 42, "enabled": True, "token": "fixture-token"}
+            )
+        captured.append(request)
+        return httpx.Response(200, json={"ok": True})
+
+    prepare = login_step()
+    prepare["extract"] = {"id": "id", "enabled": "enabled", "token": "token"}
+    send_typed_values = slow_step()
+    send_typed_values.update(
+        {
+            "name": "typed-values",
+            "endpoint_id": "ep-typed-values",
+            "headers": {"Authorization": "Bearer {{steps.login.token}}"},
+            "body": {
+                "id": "{{steps.login.id}}",
+                "enabled": "{{steps.login.enabled}}",
+            },
+        }
+    )
+    case = case_snapshot("case-typed-values", "变量类型保持", [prepare, send_typed_values])
+    case["endpoints"]["ep-typed-values"] = {
+        "id": "ep-typed-values",
+        "method": "POST",
+        "path": "/typed-values",
+        "version": 1,
+    }
+    service = service_factory(
+        FakeDependencies([case]), transport=httpx.MockTransport(typed_values)
+    )
+    run_id = service.create_run("project-1", [CaseRef(id="case-typed-values", version=1)])
+    service.execute_run(run_id)
+
+    detail = service.get_run("project-1", run_id)
+    assert detail.counts.PASS == 1
+    assert len(captured) == 1
+    body = json.loads(captured[0].content)
+    assert body == {"id": 42, "enabled": True}
+    assert type(body["id"]) is int
+    assert type(body["enabled"]) is bool
+    assert captured[0].headers["Authorization"] == "Bearer fixture-token"
