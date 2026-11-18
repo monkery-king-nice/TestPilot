@@ -1,0 +1,27 @@
+[
+  {
+    "text": "登录后显示我的信息",
+    "response": {
+      "questions": [
+        {
+          "quote": "登录",
+          "question": "登录用哪个接口，需要提供哪些字段？"
+        },
+        {
+          "quote": "显示我的信息",
+          "question": "通过哪个接口读取信息，要显示哪些字段，以什么值判定正确？"
+        },
+        {
+          "quote": "登录",
+          "question": "密码错误时应返回什么状态和错误信息？"
+        }
+      ]
+    }
+  },
+  {
+    "text": "POST /auth/login 接收 username 和 password。正确凭证返回 200 和非空字符串 token，错误密码返回 401 和错误码 INVALID_CREDENTIALS。GET /me 使用 Bearer token，返回 200 且 user.id 为 demo-user。缺少 token 时返回 401 和 UNAUTHORIZED。",
+    "response": {
+      "questions": []
+    }
+  }
+]
