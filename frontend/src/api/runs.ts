@@ -11,7 +11,7 @@ import type {
   StartRunRequest,
   StartRunResponse
 } from './types'
-import { apiFetch, projectPath } from './client'
+import { apiFetch, apiFetchText, projectPath } from './client'
 import { USE_MOCK } from './config'
 import {
   mockGetAnalysis,
@@ -54,9 +54,9 @@ export function startRun(projectId: string, req: StartRunRequest): Promise<Start
 }
 
 /** 查询运行详情（轮询用） */
-export function getRunDetail(projectId: string, runId: string, signal?: AbortSignal): Promise<RunDetail> {
+export function getRunDetail(projectId: string, runId: string): Promise<RunDetail> {
   if (USE_MOCK) return mockGetRunDetail(projectId, runId)
-  return apiFetch<RunDetail>(projectPath(projectId, `/runs/${encodeURIComponent(runId)}`), { signal })
+  return apiFetch<RunDetail>(projectPath(projectId, `/runs/${runId}`))
 }
 
 /** 失败分析（用户点击触发，仅分析已保存的脱敏结果） */
@@ -71,5 +71,6 @@ export function getAnalysis(projectId: string, runId: string, caseId: string): P
 /** 下载 HTML 报告（返回 HTML 文本） */
 export function getReportHtml(projectId: string, runId: string): Promise<string> {
   if (USE_MOCK) return mockGetReport(projectId, runId)
-  return apiFetch(projectPath(projectId, `/runs/${encodeURIComponent(runId)}/report`), { headers: { Accept: 'text/html' } }, 'text')
+  // 报告接口返回 text/html（见后端 reports/router.py 的 HTMLResponse），必须按文本读取。
+  return apiFetchText(projectPath(projectId, `/runs/${runId}/report`))
 }

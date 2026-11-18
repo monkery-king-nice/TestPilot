@@ -26,16 +26,24 @@ async function parseError(res: Response): Promise<HttpError> {
   return new HttpError(res.status, detail)
 }
 
-export function apiFetch<T>(path: string, init?: RequestInit): Promise<T>
-export function apiFetch(path: string, init: RequestInit, format: 'text'): Promise<string>
-export async function apiFetch<T>(path: string, init?: RequestInit, format?: 'text'): Promise<T | string> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...init
   })
   if (!res.ok) throw await parseError(res)
   if (res.status === 204) return undefined as T
-  return format === 'text' ? res.text() : res.json()
+  return (await res.json()) as T
+}
+
+/**
+ * 按文本读取响应（例如 `text/html` 报告），不做 JSON 解析。
+ * 报告接口返回 HTML，用 apiFetch 的 res.json() 会解析失败。
+ */
+export async function apiFetchText(path: string, init?: RequestInit): Promise<string> {
+  const res = await fetch(path, init)
+  if (!res.ok) throw await parseError(res)
+  return await res.text()
 }
 
 /** 拼接项目路径：P = /api/projects/{project_id} */

@@ -2,13 +2,20 @@
 
 import re
 import time
-from typing import Any, Callable, Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 
 from .models import CaseResult, StepResult
-from .redaction import evidence_summary, redact_structure, replace_secrets
+from .redaction import (
+    REDACTED,
+    evidence_summary,
+    is_sensitive_path,
+    redact_structure,
+    replace_secrets,
+)
 
 _TEMPLATE = re.compile(r"\{\{(env|steps)\.([A-Za-z0-9_.-]+)\}\}")
 _FULL_TEMPLATE = re.compile(r"^\{\{(env|steps)\.([A-Za-z0-9_.-]+)\}\}$")
@@ -294,13 +301,15 @@ class DeterministicExecutor:
                 if not isinstance(actual, str) or not actual:
                     diffs.append(f"{assertion.get('path')}：期望非空字符串")
             elif kind == "json_equals":
-                actual = self._path(body, assertion.get("path", ""))
+                path = assertion.get("path", "")
+                actual = self._path(body, path)
                 if actual is _MISSING or actual != expected:
+                    if is_sensitive_path(path):
+                        diffs.append(f"{path}：期望 {REDACTED}，实际 {REDACTED}")
+                        continue
                     safe_actual = "字段不存在" if actual is _MISSING else redact_structure(actual, secrets)
                     safe_expected = redact_structure(expected, secrets)
-                    diffs.append(
-                        f"{assertion.get('path')}：期望 {safe_expected!r}，实际 {safe_actual!r}"
-                    )
+                    diffs.append(f"{path}：期望 {safe_expected!r}，实际 {safe_actual!r}")
             elif kind == "elapsed_ms_lte":
                 if not isinstance(expected, (int, float)) or elapsed_ms > expected:
                     diffs.append(f"耗时：期望不超过 {expected} ms，实际 {elapsed_ms} ms")

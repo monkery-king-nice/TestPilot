@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 运行详情页：轮询 RunDetail，展示四类统计、逐用例步骤断言差异、错误阶段与脱敏证据；提供 HTML 下载。
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getReportHtml } from '@/api/runs'
@@ -16,7 +16,13 @@ const runId = () => String(route.params.runId)
 
 const { detail, loading, polling, error, restore } = useRunPolling()
 
-watch([projectId, runId], ([project, run]) => restore(project, run), { immediate: true })
+onMounted(() => restore(projectId(), runId()))
+
+// 组件在 /runs/:runId 之间会被复用：地址里的批次或项目变化时重新加载，避免继续显示旧批次。
+watch(
+  [() => route.params.projectId, () => route.params.runId],
+  () => restore(projectId(), runId())
+)
 
 const statusTag = computed(() => {
   const map: Record<RunStatus, { type: 'info' | 'primary' | 'success' | 'warning'; text: string }> = {
