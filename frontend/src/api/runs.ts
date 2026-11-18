@@ -11,7 +11,7 @@ import type {
   StartRunRequest,
   StartRunResponse
 } from './types'
-import { apiFetch, projectPath } from './client'
+import { apiFetch, apiFetchText, projectPath } from './client'
 import { USE_MOCK } from './config'
 import {
   mockGetAnalysis,
@@ -71,5 +71,6 @@ export function getAnalysis(projectId: string, runId: string, caseId: string): P
 /** 下载 HTML 报告（返回 HTML 文本） */
 export function getReportHtml(projectId: string, runId: string): Promise<string> {
   if (USE_MOCK) return mockGetReport(projectId, runId)
-  return apiFetch<string>(projectPath(projectId, `/runs/${runId}/report`))
+  // 报告接口返回 text/html（见后端 reports/router.py 的 HTMLResponse），必须按文本读取。
+  return apiFetchText(projectPath(projectId, `/runs/${runId}/report`))
 }
