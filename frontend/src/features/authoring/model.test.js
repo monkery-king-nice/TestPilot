@@ -1,0 +1,20 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { seedCases, validateCase, preflight, stats, reportHtml } from './model.js';
+test('确认、负向用例、统计与导出遵循核心约定',()=>{
+ const cases=seedCases();
+ assert.deepEqual(validateCase(cases[1]),[]);
+ assert.deepEqual(preflight([cases[1]]),[]);
+ assert.ok(preflight([cases[2]]).length);
+ assert.ok(validateCase(cases[5]).includes('绑定测试接口'));
+ assert.ok(preflight([]).length);
+ assert.ok(preflight(Array(21).fill(cases[0])).length);
+ cases[1].version++;
+ assert.ok(preflight([cases[1]]).length);
+ const results=['PASS','FAIL','ERROR','BLOCKED'].map(result=>({result,title:'<script>alert(1)</script>',id:'TC',version:1,status:200}));
+ assert.equal(stats(results).rate,25);
+ assert.equal(stats(results).done,4);
+ const html=reportHtml({id:'run',state:'COMPLETED',time:'now',results});
+ assert.ok(!html.includes('<script>'));
+ assert.ok(html.includes('&lt;script&gt;'));
+});

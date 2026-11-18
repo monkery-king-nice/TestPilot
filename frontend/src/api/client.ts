@@ -38,5 +38,5 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 /** 拼接项目路径：P = /api/projects/{project_id} */
 export function projectPath(projectId: string, suffix = ''): string {
-  return `/api/projects/${projectId}${suffix}`
+  return `/api/projects/${encodeURIComponent(projectId)}${suffix}`
 }
