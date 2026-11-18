@@ -155,3 +155,18 @@ def test_full_field_templates_preserve_scalar_types(service_factory):
     assert type(body["id"]) is int
     assert type(body["enabled"]) is bool
     assert captured[0].headers["Authorization"] == "Bearer fixture-token"
+
+
+def test_full_field_template_preserves_object_and_array():
+    from app.modules.runs.executor import DeterministicExecutor
+
+    executor = DeterministicExecutor("http://127.0.0.1:8010")
+    extracted = {"login": {"payload": {"ids": [1, 2], "enabled": True}}}
+
+    rendered = executor._render(
+        {"payload": "{{steps.login.payload}}"}, environment={}, extracted=extracted
+    )
+
+    assert rendered == {"payload": {"ids": [1, 2], "enabled": True}}
+    assert isinstance(rendered["payload"], dict)
+    assert isinstance(rendered["payload"]["ids"], list)
