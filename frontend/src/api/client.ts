@@ -26,14 +26,16 @@ async function parseError(res: Response): Promise<HttpError> {
   return new HttpError(res.status, detail)
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export function apiFetch<T>(path: string, init?: RequestInit): Promise<T>
+export function apiFetch(path: string, init: RequestInit, format: 'text'): Promise<string>
+export async function apiFetch<T>(path: string, init?: RequestInit, format?: 'text'): Promise<T | string> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...init
   })
   if (!res.ok) throw await parseError(res)
   if (res.status === 204) return undefined as T
-  return (await res.json()) as T
+  return format === 'text' ? res.text() : res.json()
 }
 
 /** 拼接项目路径：P = /api/projects/{project_id} */

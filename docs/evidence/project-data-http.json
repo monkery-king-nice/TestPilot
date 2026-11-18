@@ -1,0 +1,74 @@
+{
+  "verified_at_utc": "2026-11-18T12:18:17.540018+00:00",
+  "mode": "独立uvicorn进程、真实本机HTTP、临时SQLite文件、终止后重启验证",
+  "scope": "曾炜毅：项目基础与数据；未调用Agent、用例或执行器",
+  "python": "3.13.15",
+  "checks": [
+    {
+      "name": "空库启动与项目创建",
+      "result": "PASS",
+      "response": {
+        "id": "5862ad96-b6f0-48f6-9e26-f024b09ec65d",
+        "name": "HTTP验收项目"
+      }
+    },
+    {
+      "name": "需求创建与修改版本递增",
+      "result": "PASS",
+      "response": {
+        "id": "2e44f657-4417-4e2d-9115-142fd1166e5b",
+        "text": "POST /auth/login 成功返回200和token，GET /me 返回user.id",
+        "version": 2
+      }
+    },
+    {
+      "name": "登记登录与用户信息接口",
+      "result": "PASS",
+      "response": [
+        {
+          "id": "7d60e05c-00ca-409b-989a-c4dadc5a5166",
+          "method": "POST",
+          "path": "/auth/login",
+          "version": 1
+        },
+        {
+          "id": "1490ee82-1d43-48ff-b5fc-6a374000cfc3",
+          "method": "GET",
+          "path": "/me",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "name": "环境写入及公开读取不回传值",
+      "result": "PASS",
+      "response": {
+        "target": "demo",
+        "configured_keys": [
+          "password",
+          "username"
+        ]
+      }
+    },
+    {
+      "name": "跨项目引用拒绝",
+      "result": "PASS",
+      "status": 404,
+      "response": {
+        "detail": "项目下没有这条需求"
+      }
+    },
+    {
+      "name": "拒绝用接口路径指定外部主机",
+      "result": "PASS",
+      "status": 422,
+      "response": {
+        "detail": "请求参数不符合接口约定，请检查字段、类型和长度"
+      }
+    },
+    {
+      "name": "终止并重新启动进程后基础数据保留",
+      "result": "PASS"
+    }
+  ]
+}

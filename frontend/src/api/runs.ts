@@ -54,9 +54,9 @@ export function startRun(projectId: string, req: StartRunRequest): Promise<Start
 }
 
 /** 查询运行详情（轮询用） */
-export function getRunDetail(projectId: string, runId: string): Promise<RunDetail> {
+export function getRunDetail(projectId: string, runId: string, signal?: AbortSignal): Promise<RunDetail> {
   if (USE_MOCK) return mockGetRunDetail(projectId, runId)
-  return apiFetch<RunDetail>(projectPath(projectId, `/runs/${runId}`))
+  return apiFetch<RunDetail>(projectPath(projectId, `/runs/${encodeURIComponent(runId)}`), { signal })
 }
 
 /** 失败分析（用户点击触发，仅分析已保存的脱敏结果） */
@@ -71,5 +71,5 @@ export function getAnalysis(projectId: string, runId: string, caseId: string): P
 /** 下载 HTML 报告（返回 HTML 文本） */
 export function getReportHtml(projectId: string, runId: string): Promise<string> {
   if (USE_MOCK) return mockGetReport(projectId, runId)
-  return apiFetch<string>(projectPath(projectId, `/runs/${runId}/report`))
+  return apiFetch(projectPath(projectId, `/runs/${encodeURIComponent(runId)}/report`), { headers: { Accept: 'text/html' } }, 'text')
 }
