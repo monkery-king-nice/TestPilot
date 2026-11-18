@@ -74,7 +74,7 @@ class SharedRunDependencies:
         return self.projects.read_environment(project_id, target)
 ```
 
-上述为接入示意，未提供虚构的真实 `cases_service`。真实预检未合并，执行路由目前不注册。
+上述为适配器示意。当前分支已有真实 `CaseService`，直接实现 `preflight` 和 `read_environment` 两个方法，因此主入口直接将 `application.state.cases_service` 传给 `RunService`，无需额外适配器。cases、runs、report路由均已注册；预检字段、异常和示例见[用例模块交付说明](../backend/app/modules/cases/README.md)。
 创建执行服务时，将本模块 `settings.database_path` 和 `settings.demo_base_url` 分别传给该模块的数据库和服务端目标配置；公共数据和 runs 表可使用同一个 SQLite 文件。
 执行器读取凭证后应及时脱敏，不写入执行快照、公开响应或日志。未配置环境时，在发请求前转成明确的预检拒绝或执行错误。
 
@@ -82,8 +82,8 @@ class SharedRunDependencies:
 
 `create_app(settings=None, routers=(), startup_hooks=(), agent_provider=None)` 可注册已就绪的 APIRouter 和初始化函数，并在测试中注入Agent provider。
 生产入口为 `python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000`。
-`startup_hooks` 是同步、短时的初始化操作；未来执行器如需启动/关闭 worker，应在公共 lifespan 中成对管理，不要通过导入启动后台线程。
-应用实例状态有 `settings`、`database`、`project_repository`；未来合入时再加入 `run_service`，不预置假的执行器。
+`startup_hooks` 是同步、短时的初始化操作。执行器已在公共lifespan中成对创建/关闭worker，并在启动时恢复中断批次；模块导入不启动后台线程。
+应用实例状态有 `settings`、`database`、`project_repository`、`cases_service`；`run_service`在lifespan初始化时设置，使用相同SQLite文件和真实预检。
 
 ## 前端
 
