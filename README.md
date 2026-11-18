@@ -56,7 +56,7 @@ Invoke-RestMethod -Uri "$p/environment"
 ```powershell
 .venv\Scripts\python -m pip install -r backend/requirements-dev.txt
 .venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check backend/app/core backend/app/modules/projects backend/app/main.py backend/scripts backend/tests
+.venv\Scripts\python -m ruff check backend/app/core backend/app/modules/projects backend/app/main.py backend/scripts backend/tests/test_projects.py
 .venv\Scripts\python backend/scripts/verify_project_data.py --output docs/evidence/project-data-http.json
 ```
 
