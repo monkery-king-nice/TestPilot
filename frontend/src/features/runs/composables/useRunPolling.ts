@@ -65,10 +65,13 @@ export function useRunPolling() {
     await tick()
   }
 
-  /** 刷新/切换批次：立即拉取一次，非终态则继续轮询。 */
+  /** 刷新/切换批次：先清空旧结果，再立即拉取一次；非终态则继续轮询。 */
   async function restore(projectId: string, runId: string) {
     stopPolling()
     const token = generation
+    // 切换/刷新批次时先清空旧结果：加载失败或加载中都不能残留上一批次的数据，
+    // 也保证下载按钮只在当前批次加载成功后可用。
+    detail.value = null
     loading.value = true
     error.value = null
     try {

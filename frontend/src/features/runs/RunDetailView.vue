@@ -37,7 +37,8 @@ const statusTag = computed(() => {
 const downloading = ref(false)
 
 async function downloadReport() {
-  if (!detail.value) return
+  // 只有当前批次加载成功后才允许下载；避免按当前地址下载未成功加载的批次报告。
+  if (!detail.value || detail.value.run_id !== runId()) return
   downloading.value = true
   try {
     const html = await getReportHtml(projectId(), runId())
@@ -70,7 +71,12 @@ function goEnvironment() {
         <span class="ph-title">运行详情</span>
       </template>
       <template #extra>
-        <el-button size="small" :loading="downloading" :disabled="!detail" @click="downloadReport">
+        <el-button
+          size="small"
+          :loading="downloading"
+          :disabled="!detail || detail.run_id !== runId()"
+          @click="downloadReport"
+        >
           下载 HTML 报告
         </el-button>
       </template>
