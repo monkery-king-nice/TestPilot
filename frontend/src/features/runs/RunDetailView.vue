@@ -37,16 +37,20 @@ const statusTag = computed(() => {
 const downloading = ref(false)
 
 async function downloadReport() {
+  // 点击瞬间固定项目与批次：请求和文件名都用这组值，
+  // 避免等待期间切换到别的批次后，文件名被改成新批次（内容却还是原批次）。
+  const targetProjectId = projectId()
+  const targetRunId = runId()
   // 只有当前批次加载成功后才允许下载；避免按当前地址下载未成功加载的批次报告。
-  if (!detail.value || detail.value.run_id !== runId()) return
+  if (!detail.value || detail.value.run_id !== targetRunId) return
   downloading.value = true
   try {
-    const html = await getReportHtml(projectId(), runId())
+    const html = await getReportHtml(targetProjectId, targetRunId)
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `testpilot-report-${runId()}.html`
+    a.download = `testpilot-report-${targetRunId}.html`
     document.body.appendChild(a)
     a.click()
     a.remove()
