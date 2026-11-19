@@ -1,25 +1,28 @@
 <script setup lang="ts">
 // 失败分析面板：用户点击触发，展示 category/reason/evidence/suggestion。
-import { ref } from 'vue'
+// 组件在批次/用例之间会被复用：用请求键 + 序号保护，迟到的分析响应不会落到新对象上。
+import { watch } from 'vue'
 import { getAnalysis } from '@/api/runs'
-import type { Analysis } from '@/api/types'
+import { useAnalysisRequest } from '../composables/useAnalysisRequest'
 
 const props = defineProps<{ projectId: string; runId: string; caseId: string; outcome: string }>()
 
-const loading = ref(false)
-const analysis = ref<Analysis | null>(null)
-const error = ref<string | null>(null)
+const { analysis, loading, error, reset, run: runRequest } = useAnalysisRequest()
+
+function requestKey(): string {
+  return `${props.projectId}\u0000${props.runId}\u0000${props.caseId}`
+}
+
+// A→B 切换（可能复用同一 case_id 的组件）：清空旧分析并作废在途请求。
+watch([() => props.projectId, () => props.runId, () => props.caseId], () => reset(requestKey()))
 
 async function run() {
-  loading.value = true
-  error.value = null
-  try {
-    analysis.value = await getAnalysis(props.projectId, props.runId, props.caseId)
-  } catch (e) {
-    error.value = (e as Error).message || '分析失败'
-  } finally {
-    loading.value = false
-  }
+  // 点击瞬间固定目标对象，请求与结果都用这组值校验。
+  const targetProjectId = props.projectId
+  const targetRunId = props.runId
+  const targetCaseId = props.caseId
+  const key = `${targetProjectId}\u0000${targetRunId}\u0000${targetCaseId}`
+  await runRequest(key, () => getAnalysis(targetProjectId, targetRunId, targetCaseId))
 }
 </script>
 
