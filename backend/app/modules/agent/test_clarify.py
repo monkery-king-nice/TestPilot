@@ -1,9 +1,20 @@
 import unittest
-from unittest.mock import Mock
-from .clarify import ModelError, clarify
+from unittest.mock import Mock, patch
+from urllib.error import HTTPError
+from .clarify import ModelError, ask_json, clarify
 
 
 class ClarifyTest(unittest.TestCase):
+    def test_upstream_http_status_is_visible_without_provider_details(self):
+        failure = HTTPError("https://example.invalid", 401, "private-provider-detail", {}, None)
+        with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test"}, clear=True), patch(
+            f"{ask_json.__module__}.urlopen", side_effect=failure
+        ):
+            with self.assertRaises(ModelError) as caught:
+                ask_json("test", "test")
+        self.assertIn("HTTP 401", str(caught.exception))
+        self.assertNotIn("private-provider-detail", str(caught.exception))
+
     def test_questions_keep_source_text(self):
         text = "登录后显示我的信息"
         item = {"quote": "我的信息", "question": "具体显示哪些字段？"}

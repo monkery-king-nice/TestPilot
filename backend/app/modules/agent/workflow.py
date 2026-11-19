@@ -31,6 +31,7 @@ ANALYSIS_PROMPT = """
 只根据给出的步骤状态、错误阶段和断言差异。证据不足时说明无法确定。
 返回 JSON {"category":"分类","reason":"根据证据解释","evidence_indices":[0],"suggestion":"检查建议"}。
 证据下标从 0 开始。不要改变测试结果或断言，不要补造接口响应。
+如果结果是 FAIL 且步骤中存在断言差异，至少引用一条含差异的步骤，并区分记录到的差异与可能原因。
 """
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["Agent"])
@@ -121,6 +122,9 @@ def analyze(project_id: str, run_id: str, payload: AnalysisInput, request: Reque
             or any(type(index) is not int or not 0 <= index < len(evidence) for index in indices)
             or any(not isinstance(result.get(key), str) or not result[key].strip() for key in fields)):
         raise HTTPException(502, "模型返回的分析未对应已记录证据，请重试")
+    if case.outcome == "FAIL" and any(step.assertion_diffs for step in case.steps):
+        if not any(case.steps[index].assertion_diffs for index in indices):
+            raise HTTPException(502, "模型未引用发生断言差异的步骤，请重试")
     return {
         **{key: result[key].strip() for key in fields},
         "evidence": [evidence[index] for index in dict.fromkeys(indices)],

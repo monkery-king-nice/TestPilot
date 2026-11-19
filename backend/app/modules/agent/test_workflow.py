@@ -53,7 +53,7 @@ def test_analysis_uses_only_selected_case_evidence(tmp_path, monkeypatch):
         "run_id": "existing", "status": "COMPLETED", "counts": {"FAIL": 1},
         "results": [{
             "case_id": "c1", "title": "case", "outcome": "FAIL",
-            "steps": [{
+            "steps": [{"name": "setup", "phase": "setup", "http_status": 200}, {
                 "name": "login", "phase": "test", "http_status": 200,
                 "request_summary": "not needed for analysis",
                 "assertion_diffs": ["预期 401，实际 200"],
@@ -62,7 +62,7 @@ def test_analysis_uses_only_selected_case_evidence(tmp_path, monkeypatch):
     })
     result = {
         "category": "断言失败", "reason": "状态码异常", "suggestion": "检查登录失败分支",
-        "evidence_indices": [0],
+        "evidence_indices": [1],
     }
 
     def model(prompt, raw, **_):
@@ -81,7 +81,8 @@ def test_analysis_uses_only_selected_case_evidence(tmp_path, monkeypatch):
             assert response.status_code == 200
             assert "预期 401，实际 200" in response.json()["evidence"][0]
             assert client.post(route, json={"case_id": "missing"}).status_code == 404
-            result["evidence_indices"] = [1]
-            assert client.post(route, json={"case_id": "c1"}).status_code == 502
+            for invalid in ([], [0], [2]):
+                result["evidence_indices"] = invalid
+                assert client.post(route, json={"case_id": "c1"}).status_code == 502
         finally:
             app.state.run_service = original
