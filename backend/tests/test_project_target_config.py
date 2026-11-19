@@ -43,6 +43,7 @@ def test_local_environment_round_trip_without_secret_leak(client):
         "target": "local",
         "service_id": "service-b",
         "base_url": "http://127.0.0.1:18082",
+        "environment_version": 1,
         "configured_keys": ["password", "username"],
     }
     assert response.json() == expected
@@ -55,8 +56,13 @@ def test_local_environment_round_trip_without_secret_leak(client):
         "target": "local",
         "service_id": "service-b",
         "base_url": "http://127.0.0.1:18082",
+        "environment_version": 1,
     }
-    assert repository.read_environment(project_id, "local") == secrets()
+    assert repository.read_environment(project_id, "local", 1) == secrets()
+    with pytest.raises(HTTPException) as error:
+        repository.read_environment(project_id, "local", 2)
+    assert error.value.status_code == 409
+    assert "重新预检" in error.value.detail
     with pytest.raises(HTTPException) as error:
         repository.read_environment(project_id, "demo")
     assert error.value.status_code == 422
@@ -83,6 +89,7 @@ def test_demo_contract_and_ipv6_loopback_remain_supported(client):
         "target": "demo",
         "service_id": "demo",
         "base_url": None,
+        "environment_version": 2,
         "configured_keys": ["password", "username"],
     }
     repository = client.app.state.project_repository
@@ -186,6 +193,7 @@ def test_legacy_demo_environment_table_is_migrated_without_losing_secrets(tmp_pa
         "target": "demo",
         "service_id": "demo",
         "base_url": None,
+        "environment_version": 1,
     }
     assert repository.read_environment("legacy-project") == {
         "username": "legacy-user",
@@ -202,4 +210,5 @@ def test_legacy_demo_environment_table_is_migrated_without_losing_secrets(tmp_pa
         "target": "local",
         "service_id": "new-local",
         "base_url": "http://localhost:18085",
+        "environment_version": 2,
     }

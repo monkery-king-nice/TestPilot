@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from ...core.database import Database
 from ..projects.repository import ProjectRepository
-from ..runs.dependencies import PreflightRejected
+from ..runs.dependencies import EnvironmentChanged, PreflightRejected
 from ..runs.models import CaseRef
 from .models import CaseDraft, ManualCheckRequest
 from .validation import validate_draft
@@ -210,8 +210,15 @@ class CaseService:
             raise PreflightRejected(reasons)
         return snapshots
 
-    def read_environment(self, project_id: str, target: str) -> dict[str, str]:
-        return self.projects.read_environment(project_id, target)
+    def read_environment(
+        self, project_id: str, target: str, expected_version: int | None = None
+    ) -> dict[str, str]:
+        try:
+            return self.projects.read_environment(project_id, target, expected_version)
+        except HTTPException as error:
+            if error.status_code == 409:
+                raise EnvironmentChanged(str(error.detail)) from error
+            raise
 
     def read_execution_target(self, project_id: str) -> dict:
         try:

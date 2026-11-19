@@ -52,6 +52,7 @@ class ExecutionTarget(BaseModel):
     kind: Literal["demo", "local"]
     service_id: str
     base_url: str
+    environment_version: int | None = Field(default=None, ge=1)
 
 
 class RunDetail(BaseModel):

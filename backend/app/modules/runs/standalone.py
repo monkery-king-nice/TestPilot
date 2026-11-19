@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from .app_factory import create_runs_app
-from .dependencies import PreflightRejected
+from .dependencies import EnvironmentChanged, PreflightRejected
 from .models import CaseRef
 from .repository import RunRepository
 from .service import RunService, RunSettings
@@ -108,11 +108,20 @@ class StandaloneDependencies:
     def read_execution_target(self, project_id: str) -> dict:
         if project_id != "standalone-project":
             raise PreflightRejected(["独立演示仅支持项目 standalone-project"])
-        return {"target": "demo", "service_id": "demo", "base_url": None}
+        return {
+            "target": "demo",
+            "service_id": "demo",
+            "base_url": None,
+            "environment_version": 1,
+        }
 
-    def read_environment(self, project_id: str, target: str) -> Mapping[str, str]:
+    def read_environment(
+        self, project_id: str, target: str, expected_version: int | None = None
+    ) -> Mapping[str, str]:
         if target != "demo":
             raise PreflightRejected(["仅允许 demo 目标"])
+        if expected_version not in {None, 1}:
+            raise EnvironmentChanged("独立演示环境已变更，请重新预检并创建运行批次")
         return {
             "username": os.getenv("DEMO_USERNAME", "demo-user"),
             "password": os.environ["DEMO_PASSWORD"],

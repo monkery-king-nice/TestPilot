@@ -13,7 +13,8 @@ from .models import RequirementSource
 ENVIRONMENTS_TABLE = """CREATE TABLE IF NOT EXISTS environments (
     project_id TEXT PRIMARY KEY REFERENCES projects(id),
     target TEXT NOT NULL CHECK(target IN ('demo', 'local')),
-    service_id TEXT, base_url TEXT, secrets_json TEXT NOT NULL)"""
+    service_id TEXT, base_url TEXT, secrets_json TEXT NOT NULL,
+    environment_version INTEGER NOT NULL DEFAULT 1)"""
 
 SCHEMA = (
     """CREATE TABLE IF NOT EXISTS projects (
@@ -82,6 +83,11 @@ class ProjectRepository:
             connection.execute("ALTER TABLE environments ADD COLUMN service_id TEXT")
         if "base_url" not in columns:
             connection.execute("ALTER TABLE environments ADD COLUMN base_url TEXT")
+        if "environment_version" not in columns:
+            connection.execute(
+                "ALTER TABLE environments ADD COLUMN environment_version "
+                "INTEGER NOT NULL DEFAULT 1"
+            )
         connection.execute(
             "UPDATE environments SET service_id='demo' "
             "WHERE target='demo' AND service_id IS NULL"
@@ -404,7 +410,7 @@ class ProjectRepository:
         with self.database.connection() as connection:
             self.require_project(project_id, connection=connection)
             row = connection.execute(
-                "SELECT target, service_id, base_url, secrets_json "
+                "SELECT target, service_id, base_url, secrets_json, environment_version "
                 "FROM environments WHERE project_id=?",
                 (project_id,),
             ).fetchone()
@@ -412,6 +418,7 @@ class ProjectRepository:
                 "target": "demo" if row is None else row["target"],
                 "service_id": None if row is None else row["service_id"],
                 "base_url": None if row is None else row["base_url"],
+                "environment_version": None if row is None else row["environment_version"],
                 "configured_keys": [] if row is None else sorted(json.loads(row["secrets_json"])),
             }
 
@@ -427,16 +434,23 @@ class ProjectRepository:
         with self.database.connection(write=True) as connection:
             self.require_project(project_id, connection=connection)
             connection.execute(
-                "INSERT INTO environments(project_id, target, service_id, base_url, secrets_json) "
-                "VALUES (?, ?, ?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET "
+                "INSERT INTO environments(project_id, target, service_id, base_url, "
+                "secrets_json, environment_version) VALUES (?, ?, ?, ?, ?, 1) "
+                "ON CONFLICT(project_id) DO UPDATE SET "
                 "target=excluded.target, service_id=excluded.service_id, "
-                "base_url=excluded.base_url, secrets_json=excluded.secrets_json",
+                "base_url=excluded.base_url, secrets_json=excluded.secrets_json, "
+                "environment_version=environments.environment_version+1",
                 (project_id, target, service_id, base_url, json.dumps(secrets, ensure_ascii=False)),
             )
+            environment_version = connection.execute(
+                "SELECT environment_version FROM environments WHERE project_id=?",
+                (project_id,),
+            ).fetchone()[0]
         return {
             "target": target,
             "service_id": service_id,
             "base_url": base_url,
+            "environment_version": environment_version,
             "configured_keys": sorted(secrets),
         }
 
@@ -445,23 +459,36 @@ class ProjectRepository:
         with self.database.connection() as connection:
             self.require_project(project_id, connection=connection)
             row = connection.execute(
-                "SELECT target, service_id, base_url FROM environments WHERE project_id=?",
+                "SELECT target, service_id, base_url, environment_version "
+                "FROM environments WHERE project_id=?",
                 (project_id,),
             ).fetchone()
             if row is None:
                 raise HTTPException(422, "尚未配置项目测试环境，不能回退到默认演示服务")
             return dict(row)
 
-    def read_environment(self, project_id: str, target: str = "demo") -> dict[str, str]:
-        """Internal executor adapter. NEVER expose this mapping in an HTTP response."""
+    def read_environment(
+        self,
+        project_id: str,
+        target: str = "demo",
+        expected_version: int | None = None,
+    ) -> dict[str, str]:
+        """Atomically validate target/version and read internal secrets."""
         if target not in {"demo", "local"}:
             raise HTTPException(422, "不支持的执行目标")
         with self.database.connection() as connection:
             self.require_project(project_id, connection=connection)
             row = connection.execute(
-                "SELECT secrets_json FROM environments WHERE project_id=? AND target=?",
-                (project_id, target),
+                "SELECT target, secrets_json, environment_version "
+                "FROM environments WHERE project_id=?",
+                (project_id,),
             ).fetchone()
             if row is None:
+                raise HTTPException(422, f"项目尚未配置 {target} 测试环境")
+            if expected_version is not None and (
+                row["target"] != target or row["environment_version"] != expected_version
+            ):
+                raise HTTPException(409, "项目测试环境已变更，请重新预检并创建运行批次")
+            if row["target"] != target:
                 raise HTTPException(422, f"项目尚未配置 {target} 测试环境")
             return json.loads(row["secrets_json"])

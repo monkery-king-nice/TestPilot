@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.modules.runs.dependencies import PreflightRejected
+from app.modules.runs.dependencies import EnvironmentChanged, PreflightRejected
 from app.modules.runs.models import CaseRef
 from app.modules.runs.repository import RunRepository
 from app.modules.runs.service import RunService, RunSettings
@@ -26,6 +26,7 @@ class FakeDependencies:
             "target": "demo",
             "service_id": "demo",
             "base_url": None,
+            "environment_version": 1,
         }
         self.preflight_calls = 0
 
@@ -55,8 +56,15 @@ class FakeDependencies:
             raise PreflightRejected(["尚未配置项目测试环境"])
         return copy.deepcopy(self.execution_target)
 
-    def read_environment(self, project_id: str, target: str):
+    def read_environment(
+        self, project_id: str, target: str, expected_version: int | None = None
+    ):
         assert project_id == "project-1"
+        if expected_version is not None and (
+            target != self.execution_target["target"]
+            or expected_version != self.execution_target["environment_version"]
+        ):
+            raise EnvironmentChanged("项目测试环境已变更，请重新预检并创建运行批次")
         assert target == self.execution_target["target"]
         return copy.deepcopy(self.environment)
 

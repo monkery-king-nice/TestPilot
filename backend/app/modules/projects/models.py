@@ -163,4 +163,5 @@ class EnvironmentView(BaseModel):
     target: Literal["demo", "local"] = "demo"
     service_id: str | None = None
     base_url: str | None = None
+    environment_version: int | None = None
     configured_keys: list[str]

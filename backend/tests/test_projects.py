@@ -54,6 +54,7 @@ def test_complete_data_workflow_and_reopen_database(settings):
             "target": "demo",
             "service_id": None,
             "base_url": None,
+            "environment_version": None,
             "configured_keys": [],
         }
         response = client.put(
@@ -68,6 +69,7 @@ def test_complete_data_workflow_and_reopen_database(settings):
             "target": "demo",
             "service_id": "demo",
             "base_url": None,
+            "environment_version": 1,
             "configured_keys": ["password", "username"],
         }
         assert "fixture-password" not in response.text

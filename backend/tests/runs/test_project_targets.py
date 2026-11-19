@@ -244,6 +244,7 @@ def verify_project_targets(output_dir: Path):
                     "kind": "local",
                     "service_id": "service-b",
                     "base_url": second.base_url,
+                    "environment_version": 1,
                 }
                 assert second.received() == ["POST /auth/login", "GET /me"]
                 assert first.received() == [], "选择 B 时项目 A 的服务不得收到请求"
