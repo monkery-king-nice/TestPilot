@@ -39,10 +39,10 @@ async function run() {
       AI 失败分析
     </el-button>
 
-    <el-alert v-if="error" :title="error" type="error" :closable="false" class="mt8" />
+    <el-alert v-if="error" :title="'模型分析失败：' + error" type="error" :closable="false" show-icon class="mt8" />
 
     <div v-if="analysis" class="analysis-result">
-      <div class="cat"><el-tag type="warning" effect="dark">{{ analysis.category }}</el-tag></div>
+      <div class="cat"><el-tag type="warning" effect="dark">模型分析 · {{ analysis.category }}</el-tag></div>
       <div class="reason">{{ analysis.reason }}</div>
       <div v-if="analysis.evidence && analysis.evidence.length" class="evidence">
         <div class="label">证据</div>

@@ -171,6 +171,7 @@ export const sampleConfirmedCases: Case[] = [
 export const sampleRunDetail: RunDetail = {
   run_id: 'run-demo-0001',
   status: 'COMPLETED',
+  target: { kind: 'demo', service_id: 'demo', base_url: 'http://127.0.0.1:8010', environment_version: 1 },
   counts: { PASS: 2, FAIL: 1, ERROR: 1, BLOCKED: 1 },
   results: [
     // PASS：成功登录 → 查本人信息
