@@ -37,10 +37,32 @@ class RequirementInput(InputModel):
         return value  # Preserve source text exactly for Agent quote validation.
 
 
+class DocumentPreviewInput(InputModel):
+    path: str = Field(min_length=1, max_length=512)
+    start: int = Field(default=0, ge=0)
+    end: int | None = Field(default=None, gt=0)
+
+
+class RequirementSource(InputModel):
+    import_id: str = Field(min_length=1, max_length=128)
+    path: str = Field(min_length=1, max_length=512)
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+
+
+class RequirementCreateInput(RequirementInput):
+    source: RequirementSource | None = None
+
+
 class Requirement(BaseModel):
     id: str
     text: str
     version: int
+    source: RequirementSource | None = None
+
+
+class ConfirmImportEndpoints(InputModel):
+    candidate_ids: list[str] = Field(min_length=1, max_length=256)
 
 
 class EndpointInput(InputModel):

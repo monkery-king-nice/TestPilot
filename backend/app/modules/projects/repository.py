@@ -7,6 +7,8 @@ from uuid import uuid4
 from fastapi import HTTPException
 
 from ...core.database import Database
+from .archives import inspect_archive, preview_text
+from .models import RequirementSource
 
 SCHEMA = (
     """CREATE TABLE IF NOT EXISTS projects (
@@ -30,6 +32,19 @@ SCHEMA = (
     """CREATE TABLE IF NOT EXISTS environments (
         project_id TEXT PRIMARY KEY REFERENCES projects(id),
         target TEXT NOT NULL CHECK(target = 'demo'), secrets_json TEXT NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS project_imports (
+        id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id),
+        filename TEXT NOT NULL, archive BLOB NOT NULL, manifest TEXT NOT NULL,
+        UNIQUE (project_id, id))""",
+    """CREATE TABLE IF NOT EXISTS requirement_import_sources (
+        requirement_id TEXT PRIMARY KEY REFERENCES requirements(id),
+        project_id TEXT NOT NULL, import_id TEXT NOT NULL, path TEXT NOT NULL,
+        start INTEGER NOT NULL, end INTEGER NOT NULL,
+        FOREIGN KEY (project_id, import_id) REFERENCES project_imports(project_id, id))""",
+    """CREATE TABLE IF NOT EXISTS project_import_endpoints (
+        import_id TEXT NOT NULL REFERENCES project_imports(id),
+        candidate_id TEXT NOT NULL, endpoint_id TEXT NOT NULL REFERENCES endpoints(id),
+        PRIMARY KEY (import_id, candidate_id))""",
 )
 
 
@@ -73,15 +88,32 @@ class ProjectRepository:
         with self.database.connection() as connection:
             self.require_project(project_id, connection=connection)
             return [
-                dict(row)
+                self._requirement_with_source(row)
                 for row in connection.execute(
-                    "SELECT id, text, version FROM requirements WHERE project_id=? ORDER BY rowid",
+                    """SELECT r.id, r.text, r.version, s.import_id, s.path, s.start, s.end
+                       FROM requirements AS r LEFT JOIN requirement_import_sources AS s
+                       ON s.requirement_id = r.id AND s.project_id = r.project_id
+                       WHERE r.project_id = ? ORDER BY r.rowid""",
                     (project_id,),
                 )
             ]
 
-    def create_requirement(self, project_id: str, text: str) -> dict:
+    @staticmethod
+    def _requirement_with_source(row: sqlite3.Row) -> dict:
+        item = {key: row[key] for key in ("id", "text", "version")}
+        if row["import_id"] is not None:
+            item["source"] = {key: row[key] for key in ("import_id", "path", "start", "end")}
+        return item
+
+    def create_requirement(
+        self, project_id: str, text: str, source: RequirementSource | None = None
+    ) -> dict:
+        if source is not None:
+            self.preview_import_document(
+                project_id, source.import_id, source.path, source.start, source.end
+            )
         requirement_id = str(uuid4())
+        result = {"id": requirement_id, "text": text, "version": 1}
         with self.database.connection(write=True) as connection:
             self.require_project(project_id, connection=connection)
             connection.execute(
@@ -91,7 +123,36 @@ class ProjectRepository:
             connection.execute(
                 "INSERT INTO requirement_revisions VALUES (?, 1, ?)", (requirement_id, text)
             )
-        return {"id": requirement_id, "text": text, "version": 1}
+            if source is not None:
+                connection.execute(
+                    """INSERT INTO requirement_import_sources
+                       (requirement_id, project_id, import_id, path, start, end)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        requirement_id,
+                        project_id,
+                        source.import_id,
+                        source.path,
+                        source.start,
+                        source.end,
+                    ),
+                )
+                result["source"] = source.model_dump()
+        return result
+
+    def _requirement_source(self, connection, project_id: str, requirement_id: str):
+        row = connection.execute(
+            """SELECT import_id, path, start, end FROM requirement_import_sources
+               WHERE project_id = ? AND requirement_id = ?""",
+            (project_id, requirement_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_requirement_source(self, project_id: str, requirement_id: str) -> dict | None:
+        """Selected provenance for the Agent adapter. Manual requirements have no ZIP source."""
+        with self.database.connection() as connection:
+            self.get_requirement(project_id, requirement_id, connection=connection)
+            return self._requirement_source(connection, project_id, requirement_id)
 
     def get_requirement(
         self,
@@ -132,7 +193,11 @@ class ProjectRepository:
                 "INSERT INTO requirement_revisions VALUES (?, ?, ?)",
                 (requirement_id, version, text),
             )
-        return {"id": requirement_id, "text": text, "version": version}
+            source = self._requirement_source(connection, project_id, requirement_id)
+        result = {"id": requirement_id, "text": text, "version": version}
+        if source is not None:
+            result["source"] = source
+        return result
 
     def get_requirement_version(self, project_id: str, requirement_id: str, version: int) -> dict:
         """Historical source for internal snapshots; still checks project ownership."""
@@ -167,14 +232,116 @@ class ProjectRepository:
             ]
 
     def create_endpoint(self, project_id: str, method: str, path: str) -> dict:
+        with self.database.connection(write=True) as connection:
+            self.require_project(project_id, connection=connection)
+            return self._insert_endpoint(connection, project_id, method, path)
+
+    def _insert_endpoint(self, connection, project_id: str, method: str, path: str) -> dict:
         endpoint_id = str(uuid4())
+        connection.execute(
+            "INSERT INTO endpoints(id, project_id, method, path, version) VALUES (?, ?, ?, ?, 1)",
+            (endpoint_id, project_id, method, path),
+        )
+        return {"id": endpoint_id, "method": method, "path": path, "version": 1}
+
+    def create_import(self, project_id: str, filename: str, archive: bytes) -> dict:
+        manifest = inspect_archive(archive)
+        import_id = str(uuid4())
         with self.database.connection(write=True) as connection:
             self.require_project(project_id, connection=connection)
             connection.execute(
-                "INSERT INTO endpoints(id, project_id, method, path, version) VALUES (?, ?, ?, ?, 1)",
-                (endpoint_id, project_id, method, path),
+                "INSERT INTO project_imports(id, project_id, filename, archive, manifest) VALUES (?, ?, ?, ?, ?)",
+                (
+                    import_id,
+                    project_id,
+                    filename,
+                    archive,
+                    json.dumps(manifest, ensure_ascii=False),
+                ),
             )
-        return {"id": endpoint_id, "method": method, "path": path, "version": 1}
+        return {
+            "id": import_id,
+            "project_id": project_id,
+            "filename": filename,
+            **manifest,
+            "confirmed_endpoints": [],
+        }
+
+    def _import_row(self, connection, project_id: str, import_id: str):
+        row = connection.execute(
+            "SELECT id, project_id, filename, manifest FROM project_imports WHERE project_id = ? AND id = ?",
+            (project_id, import_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "当前项目中找不到该导入记录")
+        return row
+
+    def get_import(self, project_id: str, import_id: str) -> dict:
+        with self.database.connection() as connection:
+            row = dict(self._import_row(connection, project_id, import_id))
+            confirmed = connection.execute(
+                """SELECT c.candidate_id, e.id, e.method, e.path, e.version
+                   FROM project_import_endpoints AS c JOIN endpoints AS e ON e.id = c.endpoint_id
+                   WHERE c.import_id = ? AND e.project_id = ? ORDER BY c.rowid""",
+                (import_id, project_id),
+            )
+            result = []
+            for record in confirmed:
+                endpoint = dict(record)
+                result.append({"candidate_id": endpoint.pop("candidate_id"), "endpoint": endpoint})
+            return {**json.loads(row.pop("manifest")), **row, "confirmed_endpoints": result}
+
+    def preview_import_document(
+        self, project_id: str, import_id: str, path: str, start: int = 0, end: int | None = None
+    ) -> dict:
+        with self.database.connection() as connection:
+            row = self._import_row(connection, project_id, import_id)
+            if not any(doc["path"] == path for doc in json.loads(row["manifest"])["documents"]):
+                raise HTTPException(404, "导入记录中没有这个可预览的文档")
+            archive = connection.execute(
+                "SELECT archive FROM project_imports WHERE project_id = ? AND id = ?",
+                (project_id, import_id),
+            ).fetchone()["archive"]
+        return {"import_id": import_id, **preview_text(archive, path, start, end)}
+
+    def confirm_import_endpoints(self, project_id: str, import_id: str, candidate_ids: list[str]):
+        with self.database.connection(write=True) as connection:
+            row = self._import_row(connection, project_id, import_id)
+            candidates = {
+                item["candidate_id"]: item
+                for item in json.loads(row["manifest"])["endpoint_candidates"]
+            }
+            selected = []
+            for candidate_id in dict.fromkeys(candidate_ids):
+                candidate = candidates.get(candidate_id)
+                if candidate is None:
+                    raise HTTPException(422, "选择包含当前导入中不存在的接口")
+                if candidate["requires_manual_registration"]:
+                    raise HTTPException(
+                        422, "所选接口包含模板或查询参数，请填写实际相对路径并手工登记"
+                    )
+                selected.append(candidate)
+            results = []
+            for candidate in selected:
+                candidate_id = candidate["candidate_id"]
+                method, path = candidate["method"], candidate["path"]
+                found = connection.execute(
+                    """SELECT id, method, path, version FROM endpoints
+                       WHERE project_id = ? AND method = ? AND path = ? ORDER BY rowid LIMIT 1""",
+                    (project_id, method, path),
+                ).fetchone()
+                endpoint = (
+                    dict(found)
+                    if found
+                    else self._insert_endpoint(connection, project_id, method, path)
+                )
+                connection.execute(
+                    """INSERT INTO project_import_endpoints(import_id, candidate_id, endpoint_id)
+                       VALUES (?, ?, ?) ON CONFLICT(import_id, candidate_id) DO NOTHING""",
+                    (import_id, candidate_id, endpoint["id"]),
+                )
+                results.append({"candidate_id": candidate_id, "endpoint": endpoint})
+        return {"project_id": project_id, "import_id": import_id, "endpoints": results}
 
     def get_endpoint(
         self,
