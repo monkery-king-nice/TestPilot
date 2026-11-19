@@ -49,6 +49,10 @@ if __name__ == "__main__":
             archive.writestr("src/main.py", 'print("fixture")')
         with ZipFile(args.samples_dir / "long-doc.zip", "w") as archive:
             archive.writestr("long.txt", "中" * 16010)
+        # Stored binary payload exercises actual upload bytes without a large expansion ratio.
+        with ZipFile(args.samples_dir / "large-project.zip", "w") as archive:
+            archive.writestr("assets/padding.bin", b"\0" * int(32.7 * 1024 * 1024))
+            archive.writestr("docs/requirements.md", "# 大包上传回归样本\n\n预览此需求文档。\n")
         print("Created project UI regression samples")
         raise SystemExit(0)
     workflow.model_response = generate

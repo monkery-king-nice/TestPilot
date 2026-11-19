@@ -51,7 +51,7 @@ function upload(event: Event) {
   if (!file) return
   return perform(async () => {
     if (!/\.zip$/i.test(file.name)) throw new Error('请选择 ZIP 项目包，或在下方单独导入 MD/TXT')
-    if (file.size > 8 * 1024 * 1024) throw new Error('ZIP 最多 8 MiB，请精简项目包后重试')
+    if (file.size > 40 * 1024 * 1024) throw new Error('ZIP 最多 40 MiB，请精简项目包后重试')
     const result = await uploadProject(props.projectId, file)
     manifest.value = result
     documentPath.value = ''
@@ -86,7 +86,7 @@ function register() {
     <template #header>项目资料</template>
     <input ref="fileInput" type="file" accept=".zip" hidden @change="upload" />
     <el-button :disabled="disabled || busy" @click="fileInput?.click()">上传项目 ZIP</el-button>
-    <p>支持最多 8 MiB 的 ZIP。上传后选择需求文档，再确认需要登记的接口。</p>
+    <p>支持最多 40 MiB 的 ZIP。上传后选择需求文档，再确认需要登记的接口。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <div v-if="manifest">
       <p role="status">已上传 {{ manifest.filename }} · {{ manifest.documents.length }} 份可选文档</p>

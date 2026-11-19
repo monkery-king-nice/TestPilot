@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { HttpError } from '@/api/client'
 import { readRequirementFile } from './requirementFile'
@@ -33,6 +33,40 @@ const error = ref('')
 const clarification = ref<Clarification | null>(null)
 const saved = computed(() => requirements.value.find(item => item.id === selected.value))
 const edited = computed(() => text.value !== (saved.value?.text ?? ''))
+const hasUnsaved = computed(() => edited.value || answers.value.some(answer => answer.trim()))
+
+let leaveDecision: Promise<boolean> | undefined
+async function decideLeave(): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm('需求原文或补充答案尚未保存。可以保存后离开，或确认放弃。关闭此窗口可继续编辑。', '未保存的需求或答案', {
+      confirmButtonText: '保存后离开', cancelButtonText: '放弃并离开',
+      distinguishCancelAndClose: true, closeOnClickModal: false, type: 'warning',
+    })
+    await save()
+    return !hasUnsaved.value && !working.value && !conflict.value
+  } catch (action) { return action === 'cancel' }
+}
+
+onBeforeRouteLeave(to => {
+  if (working.value) return false
+  if (!hasUnsaved.value) return true
+  if (!leaveDecision) leaveDecision = decideLeave().finally(() => { leaveDecision = undefined })
+  return leaveDecision.then(allowed => {
+    if (allowed && !hasUnsaved.value && to.name === 'cases' && saved.value && to.query.requirement !== saved.value.id) {
+      return { name: 'cases', params: to.params, query: { ...to.query, requirement: saved.value.id } }
+    }
+    return allowed
+  })
+})
+
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (hasUnsaved.value || working.value) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+onMounted(() => window.addEventListener('beforeunload', beforeUnload))
+onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
 
 function select(id: string, preserveImport = false) {
   selected.value = id
@@ -43,7 +77,7 @@ function select(id: string, preserveImport = false) {
   clarificationVersion.value = undefined
   supplementPreview.value = ''
   conflict.value = false
-  void router.replace({ query: {
+  if (!leaveDecision) void router.replace({ query: {
     ...route.query, requirement: id || undefined,
     import: preserveImport ? route.query.import || saved.value?.source?.import_id : saved.value?.source?.import_id || route.query.import,
   } })
@@ -56,7 +90,7 @@ function resetQuestions() {
 }
 
 async function canReplace() {
-  if (!edited.value && !answers.value.some(answer => answer.trim())) return true
+  if (!hasUnsaved.value) return true
   try {
     await ElMessageBox.confirm('将替换尚未保存的原文或答案。是否继续？', '替换未保存内容', {
       confirmButtonText: '替换内容', cancelButtonText: '保留原稿', type: 'warning',

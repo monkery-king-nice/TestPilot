@@ -101,14 +101,14 @@ async def upload_project_import(
         if length < 0:
             raise HTTPException(400, "上传长度无效")
         if length > MAX_UPLOAD:
-            raise HTTPException(413, "ZIP 上传最多 8 MiB")
+            raise HTTPException(413, "ZIP 上传最多 40 MiB")
     filename = upload_name(filename)
     await run_in_threadpool(repository.require_project, project_id)
     data = bytearray()
     try:
         async for chunk in request.stream():
             if len(data) + len(chunk) > MAX_UPLOAD:
-                raise HTTPException(413, "ZIP 上传最多 8 MiB")
+                raise HTTPException(413, "ZIP 上传最多 40 MiB")
             data.extend(chunk)
     except ClientDisconnect as exc:
         raise HTTPException(400, "上传中断，请重新上传 ZIP") from exc

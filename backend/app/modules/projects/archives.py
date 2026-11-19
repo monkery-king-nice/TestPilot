@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from .models import EndpointInput
 
-MAX_UPLOAD = 8 * 1024 * 1024
+MAX_UPLOAD = 40 * 1024 * 1024
 MAX_EXPANDED = 48 * 1024 * 1024
 MAX_ENTRIES = 512
 MAX_TEXT = 1024 * 1024
