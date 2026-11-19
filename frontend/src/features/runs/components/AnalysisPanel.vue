@@ -2,7 +2,6 @@
 // 失败分析面板：用户点击触发，展示 category/reason/evidence/suggestion。
 import { ref } from 'vue'
 import { getAnalysis } from '@/api/runs'
-import { USE_MOCK } from '@/api/config'
 import type { Analysis } from '@/api/types'
 
 const props = defineProps<{ projectId: string; runId: string; caseId: string; outcome: string }>()
@@ -26,13 +25,7 @@ async function run() {
 
 <template>
   <div class="analysis-panel">
-    <!-- 真实模式：后端失败分析接口尚未上线，禁用并标注「待接入」；演示模式保留样例。 -->
-    <template v-if="!USE_MOCK">
-      <el-button size="small" type="warning" plain disabled>AI 失败分析（待接入）</el-button>
-      <div class="pending-hint">后端失败分析接口尚未上线，真实模式下暂不可用。</div>
-    </template>
     <el-button
-      v-else
       size="small"
       type="warning"
       plain
@@ -107,10 +100,5 @@ async function run() {
 }
 .mt8 {
   margin-top: 8px;
-}
-.pending-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #9ca3af;
 }
 </style>

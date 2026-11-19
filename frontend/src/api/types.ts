@@ -21,9 +21,9 @@ export type Outcome = 'PASS' | 'FAIL' | 'ERROR' | 'BLOCKED'
 export interface Assertion {
   type: AssertionType
   /** status 断言的期望状态码 */
-  expected?: number | string
+  expected?: unknown
   /** json 断言的字段路径（点分隔） */
-  path?: string
+  path?: string | null
 }
 
 /** CaseDraft 中的一步（见共同接口约定） */
@@ -39,15 +39,19 @@ export interface CaseStep {
 }
 
 /** 已保存的用例（含 id/version/status） */
-export interface Case {
-  id: string
+export interface CaseDraft {
   title: string
-  version: number
-  status: CaseStatus
   requirement_id: string
   requirement_version: number
   expected_basis: string
   steps: CaseStep[]
+}
+
+export interface Case extends CaseDraft {
+  id: string
+  version: number
+  status: CaseStatus
+  reasons?: string[]
 }
 
 /** 环境读取结果：只返回字段名，不返回值（服务端执行器独享读取） */

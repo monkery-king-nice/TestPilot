@@ -36,7 +36,7 @@ def result(text, payload):
     return {"status": "NEEDS_INFO" if questions else "READY", "questions": questions}
 
 
-def ask_model(text):
+def ask_json(prompt, text, *, max_tokens=2400):
     official_url = "https://api.deepseek.com/chat/completions"
     url = os.getenv("TESTPILOT_MODEL_URL", official_url)
     model = os.getenv("TESTPILOT_MODEL", "deepseek-flash" if url == official_url else "")
@@ -54,15 +54,31 @@ def ask_model(text):
     headers = {"Content-Type": "application/json"}
     if key:
         headers["Authorization"] = "Bearer " + key
-    body = {"model": model, "messages": [{"role": "system", "content": PROMPT},
-                                          {"role": "user", "content": text}]}
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": text},
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": max_tokens,
+    }
+    if url == official_url:
+        body["thinking"] = {"type": "disabled"}
     req = Request(url, data=json.dumps(body).encode(), headers=headers)
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=45) as resp:
             envelope = json.load(resp)
         return json.loads(envelope["choices"][0]["message"]["content"])
     except (URLError, OSError, KeyError, IndexError, TypeError, ValueError) as exc:
         raise ModelError("模型调用失败或未返回有效 JSON，请检查服务配置后重试") from exc
+
+
+def ask_model(text):
+    return ask_json(PROMPT + """
+例如 {"questions":[{"quote":"原文片段","question":"待确认的条件是什么？"}]}。
+只检查当前需求指定范围。测试账号密码若由环境配置提供，视为已说明，不索取具体值。
+明确标为范围外的行为不追问。""", text)
 
 
 def clarify(text, provider=ask_model):
