@@ -9,6 +9,7 @@ from .core.config import Settings
 from .core.database import Database
 from .core.errors import install_error_handlers
 from .modules.agent.router import build_router as build_agent_router
+from .modules.agent.workflow import router as workflow_router
 from .modules.cases.router import router as cases_router
 from .modules.cases.service import CaseService
 from .modules.projects.repository import ProjectRepository
@@ -56,6 +57,7 @@ def create_app(
     install_error_handlers(application)
     application.include_router(projects_router)
     application.include_router(build_agent_router(repository.load_text, provider=agent_provider))
+    application.include_router(workflow_router)
     application.include_router(cases_router)
     application.include_router(runs_router)
     application.include_router(reports_router)

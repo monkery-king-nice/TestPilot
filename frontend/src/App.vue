@@ -23,7 +23,11 @@ const nav = [
     </template>
     <span v-if="USE_MOCK">样例模式</span>
   </header>
-  <main class="app-content"><router-view /></main>
+  <main class="app-content">
+    <router-view v-slot="{ Component }">
+      <component :is="Component" :key="String(route.params.projectId ?? '')" />
+    </router-view>
+  </main>
 </template>
 
 <style>

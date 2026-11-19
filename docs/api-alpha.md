@@ -20,6 +20,8 @@ P = `/api/projects/{project_id}`。
 | PUT | `P/environment` | 200，同GET，不回传环境值 |
 | GET | `/api/health` | 200，`{status:"ok"}` |
 | POST | `P/agent/clarify` | 请求`{requirement_id}`，读取真实需求库，返回`{status,questions}`；缺模型配置或模型调用失败502 |
+| POST | `P/agent/generate` | 请求 `{requirement_id}`，返回 `{drafts:[CaseDraft]}`。资料不足返回 422。通过用例接口另行保存和确认。 |
+| POST | `P/runs/{run_id}/analysis` | 请求 `{case_id}`，返回 `{category,reason,evidence,suggestion}`。分析已结束批次中的非 PASS 结果。 |
 
 - 创建请求字段与下文共同契约相同，输入严格校验，拒绝多余字段。
 - 项目名1–100字符；需求正文1–16000字符且不能全空白，保留原文空白和换行。
@@ -37,9 +39,9 @@ P = `/api/projects/{project_id}`。
 
 字段样例、错误码、预检签名和实测情况见[用例模块交付说明](../backend/app/modules/cases/README.md)。报告仅供已结束批次下载；进行中409，不存在或跨项目404。
 
-## 全组待接通接口
+## Agent 生成与分析
 
-Agent生成及分析尚未合入，当前调用这些路径会得到404。需求澄清已合入并完成真实数据库适配；本次新增用例、执行与报告接口，不包含Agent生成或失败分析的实现。
+生成使用当前需求文本和项目登记的端点。失败分析只读取已保存的步骤状态、错误阶段和脱敏断言差异。模型调用失败返回 502，原有运行结果和报告仍可读取。
 输入、输出及状态约定见下文原始公共契约。
 
 ## 六人共用的 Alpha v1 接口约定
