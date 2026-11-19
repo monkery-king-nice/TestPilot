@@ -11,8 +11,19 @@ const route = useRoute()
 const router = useRouter()
 const projectId = () => String(route.params.projectId)
 
-const { target, serviceId, baseUrl, environmentVersion, configuredKeys, loading, saving, load, save } =
-  useEnvironment(projectId)
+const {
+  target,
+  serviceId,
+  baseUrl,
+  environmentVersion,
+  configuredKeys,
+  loading,
+  saving,
+  loaded,
+  loadError,
+  load,
+  save
+} = useEnvironment(projectId)
 
 const form = reactive({
   target: 'local' as TargetKind,
@@ -55,6 +66,11 @@ const REASON_MESSAGE: Record<string, string> = {
 }
 
 async function onSubmit() {
+  // 读取失败时凭据状态未知，不能当作「没有已保存凭据」而保存，避免误清空。
+  if (!loaded.value) {
+    ElMessage.warning('环境状态尚未读取成功，请先点击「重试」')
+    return
+  }
   if (isLocal.value && (!form.serviceId.trim() || !form.baseUrl.trim())) {
     ElMessage.warning('本地服务需要填写服务标识与回环地址')
     return
@@ -161,7 +177,7 @@ function goRun() {
           </el-text>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
+          <el-button type="primary" :loading="saving" :disabled="!loaded" @click="onSubmit">保存</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -174,18 +190,27 @@ function goRun() {
         </div>
       </template>
 
-      <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="目标类型">{{ target }}</el-descriptions-item>
-        <el-descriptions-item label="环境版本">{{ environmentVersion ?? '未配置' }}</el-descriptions-item>
-        <el-descriptions-item label="服务标识">{{ serviceId ?? '—' }}</el-descriptions-item>
-        <el-descriptions-item label="服务地址">{{ baseUrl ?? '—' }}</el-descriptions-item>
-      </el-descriptions>
+      <el-alert v-if="loadError" type="error" :closable="false" show-icon>
+        <template #title>
+          环境状态读取失败：{{ loadError }}。
+          <el-link type="primary" :underline="false" @click="load">重试</el-link>
+        </template>
+      </el-alert>
 
-      <div class="keys mt12">
-        <el-text type="info" size="small">已配置字段：</el-text>
-        <el-tag v-for="k in configuredKeys" :key="k" effect="plain" class="key-tag">{{ k }}</el-tag>
-        <el-text v-if="!configuredKeys.length" type="info" size="small">尚未配置</el-text>
-      </div>
+      <template v-else>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="目标类型">{{ target }}</el-descriptions-item>
+          <el-descriptions-item label="环境版本">{{ environmentVersion ?? '未配置' }}</el-descriptions-item>
+          <el-descriptions-item label="服务标识">{{ serviceId ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="服务地址">{{ baseUrl ?? '—' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="keys mt12">
+          <el-text type="info" size="small">已配置字段：</el-text>
+          <el-tag v-for="k in configuredKeys" :key="k" effect="plain" class="key-tag">{{ k }}</el-tag>
+          <el-text v-if="!configuredKeys.length" type="info" size="small">尚未配置</el-text>
+        </div>
+      </template>
     </el-card>
 
     <div class="mt16">
