@@ -12,6 +12,7 @@
 
 已在独立源码目录按原说明创建新虚拟环境，安装后端requirements、在frontend运行npm ci，并通过原有7项project-data真实HTTP检查。工具版本为Python 3.13.15、Node.js 24.18.0、npm 11.16.0。
 基线后端回归为93 passed。原根README存在重复的前端章节，默认dev进入Mock，需要操作者手动对齐三项服务。
+启动入口测试使用Windows PowerShell 5.1.26100.9818；代码测试提交为`18feb5990a29bf431136381de0619f2558b4a001`。
 
 ## 本次实现
 
@@ -31,7 +32,11 @@ python scripts/verify_startup.py --output docs/evidence/phase2-startup.json
 
 9项诊断测试已通过，覆盖缺少Node/npm、低版本、被占端口保留、只读检查、缺依赖拒绝以及模型环境隔离。
 独立环境验收分别记录：干净目录安装与三服务启动、真实Vite代理创建项目和需求、无模型人工确认与执行报告、服务停止后端口释放、重启后相同ID/文本/历史报告、缺Node修复提示、原端口占用进程和数据库不变。
-准确测试提交、时间、版本及脱敏ID见[验收JSON](evidence/phase2-startup.json)；完成测试后以该文件中的实际记录为准。
+结果为 **9项诊断测试通过、8项独立环境验收通过**。首次在无.venv和node_modules的新检出中实际安装，再用新SQLite创建项目及需求；另一次以SkipInstall重启并读取相同ID、正文和历史报告。
+准确时间、版本及脱敏ID见[验收JSON](evidence/phase2-startup.json)。
+真实浏览器另创建项目`f7480a46-ae8d-4c3b-9230-a89610cfe18c`及需求`88a64d9b-1416-472e-89ec-e832ef7f07c9`，保存后刷新，界面仍显示相同正文和已保存版本v1。
+
+![真实模式需求保存后刷新](evidence/phase2-startup-ui.png)
 
 ## 交接与待验证
 
