@@ -18,6 +18,35 @@ python -m venv .venv
 - 变量嵌入其他文字时按字符串处理。例如 `"Authorization": "Bearer {{steps.login.token}}"` 会生成 `Bearer <token>`。
 - 嵌入字符串的变量必须是字符串、数字或布尔值；对象和数组应通过整字段引用传递，避免被隐式转换为不明确的字符串。
 
+## 第二阶段：四类运行结果证据
+
+从仓库根目录运行开发者自测。脚本使用两个独立临时 SQLite 数据库，平台 API 使用 TestClient，被测登录服务使用真实本机 HTTP；不调用模型，不修改共享演示库。
+
+```powershell
+.venv\Scripts\python backend/tests/runs/phase2_evidence.py verify --output-dir artifacts/phase2-run-outcomes
+```
+
+输出 `evidence.json`，逐项保存项目、需求版本、用例版本、批次、步骤状态、断言差异和演示服务请求记录。FAIL 的 `user.id` 预期被**人为**写成 `different-user`；BLOCKED 的准备登录**人为**使用错误密码；ERROR 使用单独启动后又停止的本机实例，不与共享正常服务混用。
+
+| 场景 | 预期与实际核对点 |
+|---|---|
+| PASS | 错误密码是被测行为，登录实际 401，`code=INVALID_CREDENTIALS`，计数 PASS=1 |
+| FAIL | 登录和 `/me` 均为 200，`me.error_stage=assertion`，保存用户编号不匹配的脱敏差异 |
+| BLOCKED | 准备登录实际 401，主步骤 `error_stage=setup_failed`，请求日志只有登录、没有 `/me` |
+| ERROR | 停止实例导致 `error_stage=connection`、HTTP 状态为 null，计数 ERROR=1 |
+
+已有 `test_timeout_becomes_error_with_evidence` 仍单独记录 `httpx.MockTransport` 超时替身，不把它算作停止实例的真实连接证据。
+
+### 给共同验收准备草稿
+
+先按根 README 启动真实模式，并在当前终端设置 `DEMO_PASSWORD`。以下命令只创建独立项目、环境以及 PASS／FAIL／BLOCKED 三个草稿，**不自动确认、不自动执行**：
+
+```powershell
+.venv\Scripts\python backend/tests/runs/phase2_evidence.py prepare --api-base http://127.0.0.1:8000
+```
+
+`artifacts/phase2-run-outcomes/preparation.json` 保存交接 ID 和后续人工步骤。请逐条复核并人工确认；由郭泽强在共享验收页最终点击执行，优先把 FAIL 的 `run_id/case_id/case_version` 和脱敏差异交给失败分析与页面、报告负责人。共享环境的最终批次、真实 DeepSeek 分析和浏览器人工点击不在开发者自测中冒充完成。
+
 ## 公共后端合入前的独立演示
 
 先在一个 PowerShell 窗口启动团队演示服务：
