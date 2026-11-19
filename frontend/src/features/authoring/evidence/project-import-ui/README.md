@@ -1,6 +1,6 @@
 # 项目 ZIP 与需求补充页面交接
 
-基线 main 为 4cdb389，功能与测试提交为 9dc1797。实测日期为 2026-11-19，Windows、Node 24.14.0、Python 3.13、pytest 8.4.2、Edge。后端依赖按 backend/requirements.txt 安装。
+基线 main 为 4cdb389，初版功能提交为 9dc1797，复审修复提交为 667749a。实测日期为 2026-11-19，Windows、Node 24.14.0、Python 3.13、pytest 8.4.2、Edge。后端依赖按 backend/requirements.txt 安装。
 
 ## 实现与边界
 
@@ -27,11 +27,15 @@ ZIP、预览、登记和需求保存均请求真实 FastAPI，写入独立 SQLit
 ## 反例结果
 
 - 取消文件选择不修改原文，取消替换保留未保存输入。
-- 坏 ZIP 不修改已有需求，8 MiB 超限在上传前提示并保留原文。
+- 坏 ZIP 不修改已有需求，40 MiB 超限在上传前提示并保留原文。
+- 前后端上传上限均为 40 MiB。后端回归接受恰好 40 MiB 的有效 ZIP，增加一个字节返回 413，未多建导入记录。
+- 约 32.7 MiB 的合成 ZIP 经浏览器上传成功，可预览 docs/requirements.md。其大小和合成标记记录在 handoff.json。评审提到的正式原包尚未取得，本次结果属于合成大包回归，原包验收待补。
 - 包内无需求文档时可手工录入，长文档可选择合法的 16000 字符以内片段。
 - 另一客户端已更新需求后，旧答案保存返回 409。原文和答案保持可见，用户取消加载最新需求后仍保留答案。
 - 在多个需求中保存新的片段后刷新，仍回到刚保存的需求。
 - 原有 MD/TXT 文件导入浏览器回归通过。
+- 未保存答案时点击用例页，关闭提示保留答案；选择保存后离开，用例页读取 v2；选择放弃后才离开。
+- 刷新时取消浏览器提示可保留答案。版本冲突导致保存失败时继续留在需求页并保留答案。
 
 ## 复现命令
 
@@ -43,7 +47,7 @@ py -3.13 -m venv .venv
 .venv/Scripts/python -m pytest backend/tests/test_projects.py backend/tests/test_project_imports.py backend/tests/test_requirement_update_version.py backend/app/modules/agent/test_project_context.py -q
 ```
 
-实际为 54 passed，保留现有 TestClient 弃用提示。前端从 frontend 目录执行，实际为 3 项 Node 测试通过，类型检查和构建通过，构建有现有的大文件体积提示。
+实际为 55 passed，保留现有 TestClient 弃用提示。前端从 frontend 目录执行，实际为 3 项 Node 测试通过，类型检查和构建通过，构建有现有的大文件体积提示。
 
 ```powershell
 cd frontend
@@ -93,5 +97,6 @@ node frontend/src/features/authoring/requirementImport.browser.cjs
 - [刷新后的 v2 和来源](03-saved-v2-source.png)
 - [过期答案拦截](04-stale-answer-preserved.png)
 - [长文档与上传超限](05-limits-preserve-source.png)
+- [32.7 MiB 合成 ZIP 上传和文档预览](06-large-zip-preview.png)
 
 郭泽强负责真实模型和正式项目验收及最终合并，沈冠宇可沿用两版需求做用例复核。陈睿涛的环境与执行页面继续使用已确认用例衔接。
