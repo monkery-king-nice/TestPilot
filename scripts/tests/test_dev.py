@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "dev.py"
 SPEC = importlib.util.spec_from_file_location("testpilot_dev", SCRIPT)
@@ -90,6 +90,66 @@ class StartupTests(unittest.TestCase):
             self.assertEqual(
                 dev.child_environment(model=True)["DEEPSEEK_API_KEY"], "private-test-sentinel"
             )
+
+    def test_first_install_and_service_credentials_stay_with_their_owners(self):
+        model_settings = {
+            "DEEPSEEK_API_KEY": "fake-deepseek-key",
+            "TESTPILOT_MODEL_KEY": "fake-compatible-key",
+            "TESTPILOT_MODEL_URL": "https://model.example.invalid/chat/completions",
+            "TESTPILOT_MODEL": "fake-model",
+        }
+        demo_password = "fake-demo-password"
+        parent_settings = {**model_settings, "DEMO_PASSWORD": demo_password}
+        for no_model in (False, True):
+            with self.subTest(no_model=no_model), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                child = Mock(stdin=None)
+                child.wait.return_value = child.poll.return_value = 0
+                with (
+                    patch.dict(os.environ, parent_settings),
+                    patch.object(dev, "ROOT", root),
+                    patch.object(dev, "node_tools", return_value=("node", "npm-cli.js")),
+                    patch.object(dev, "check_ports"),
+                    patch.object(dev, "wait_ready"),
+                    patch.object(dev, "WindowsJob"),
+                    patch.object(dev.sys, "stdin", io.StringIO("\n")),
+                    patch.object(dev.subprocess, "Popen", return_value=child) as popen,
+                    redirect_stdout(io.StringIO()) as output,
+                ):
+                    args = ["--database", "repro.sqlite3"]
+                    if no_model:
+                        args.append("--no-model")
+                    self.assertEqual(dev.main(args), 0)
+                    for name, value in parent_settings.items():
+                        self.assertEqual(os.environ[name], value)
+
+                self.assertEqual(popen.call_count, 6)
+                venv, pip, npm, demo, api, frontend = popen.call_args_list
+                self.assertEqual(venv.args[0][1:3], ["-m", "venv"])
+                self.assertEqual(pip.args[0][1:4], ["-m", "pip", "install"])
+                self.assertEqual(npm.args[0][2], "ci")
+                self.assertEqual(demo.args[0][-1], "demo")
+                self.assertEqual(api.args[0][-1], "api")
+                self.assertEqual(frontend.args[0][2:4], ["run", "dev"])
+
+                for call in (venv, pip, npm, frontend):
+                    env = call.kwargs["env"]
+                    self.assertIsNotNone(env)
+                    for name in parent_settings:
+                        self.assertNotIn(name, env)
+
+                demo_env = demo.kwargs["env"]
+                api_env = api.kwargs["env"]
+                self.assertEqual(demo_env["DEMO_PASSWORD"], demo_password)
+                self.assertNotIn("DEMO_PASSWORD", api_env)
+                for name, value in model_settings.items():
+                    self.assertNotIn(name, demo_env)
+                    if no_model:
+                        self.assertNotIn(name, api_env)
+                    else:
+                        self.assertEqual(api_env[name], value)
+                for value in parent_settings.values():
+                    self.assertNotIn(value, output.getvalue())
 
     def test_tool_failure_is_an_actionable_error(self):
         with patch.object(dev.subprocess, "run", side_effect=FileNotFoundError):

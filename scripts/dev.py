@@ -118,7 +118,7 @@ class Processes:
         self.children = []
         self.job = WindowsJob() if os.name == "nt" else None
 
-    def spawn(self, command, *, cwd=ROOT, env=None, service=False):
+    def spawn(self, command, *, cwd=ROOT, env, service=False):
         options = (
             {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
             if os.name == "nt"
@@ -136,7 +136,7 @@ class Processes:
         self.children.append(process)
         return process
 
-    def run(self, command, *, cwd=ROOT, env=None, description):
+    def run(self, command, *, cwd=ROOT, env, description):
         say(f"[install] {description}")
         if self.spawn(command, cwd=cwd, env=env).wait() != 0:
             raise StartError(
@@ -180,7 +180,9 @@ class Processes:
 
 def version(command, name, minimum):
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=15, check=True)
+        result = subprocess.run(
+            command, env=child_environment(), capture_output=True, text=True, timeout=15, check=True
+        )
         value = result.stdout.strip().lstrip("v")
         if int(value.split(".")[0]) < minimum:
             raise ValueError()
@@ -247,6 +249,7 @@ def installed(python):
                     "-c",
                     "import fastapi,uvicorn,httpx,pydantic; assert tuple(__import__('sys').version_info)>=(3,11)",
                 ],
+                env=child_environment(),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=15,
@@ -286,6 +289,7 @@ def wait_ready(processes, url, expected, *, json_body=None):
 
 def child_environment(*, model=False):
     env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
+    env.pop("DEMO_PASSWORD", None)
     if not model:
         for name in MODEL_KEYS:
             env.pop(name, None)
@@ -355,9 +359,12 @@ def main(argv=None):
     processes = Processes()
     try:
         if not args.skip_install:
+            install_env = child_environment()
             if not python.exists():
                 processes.run(
-                    [sys.executable, "-m", "venv", str(ROOT / ".venv")], description="create .venv"
+                    [sys.executable, "-m", "venv", str(ROOT / ".venv")],
+                    env=install_env,
+                    description="create .venv",
                 )
             processes.run(
                 [
@@ -370,21 +377,19 @@ def main(argv=None):
                     "-c",
                     "backend/requirements-lock.txt",
                 ],
+                env=install_env,
                 description="install backend requirements",
             )
             processes.run(
                 [node, npm_cli, "ci", "--no-audit", "--no-fund"],
                 cwd=ROOT / "frontend",
-                env=child_environment(),
+                env=install_env,
                 description="npm ci (existing package-lock.json)",
             )
         demo_env = child_environment()
         demo_env["DEMO_PASSWORD"] = password
-        api_env = child_environment(model=True)
+        api_env = child_environment(model=not args.no_model)
         api_env.update(TESTPILOT_DATABASE=str(database), DEMO_BASE_URL="http://127.0.0.1:8010")
-        if args.no_model:
-            for name in MODEL_KEYS:
-                api_env[name] = ""
         configured = bool(
             api_env.get("DEEPSEEK_API_KEY")
             or api_env.get("TESTPILOT_MODEL_KEY")
@@ -394,7 +399,6 @@ def main(argv=None):
             f"[model] {'configured (values hidden)' if configured else 'not configured/disabled; confirmed cases and reports remain usable'}"
         )
         frontend_env = child_environment()
-        frontend_env.pop("DEMO_PASSWORD", None)
         frontend_env["VITE_USE_MOCK"] = "false"
         host = str(ROOT / "scripts/service_host.py")
         demo = processes.spawn([str(python), host, "demo"], env=demo_env, service=True)
