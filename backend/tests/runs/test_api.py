@@ -98,3 +98,44 @@ def test_cross_project_run_read_is_404(demo_server, service_factory):
         run_id, _ = execute(client, service, "case-pass")
         response = client.get(f"/api/projects/another-project/runs/{run_id}")
         assert response.status_code == 404
+
+def test_create_run_rejects_changed_environment_version(service_factory):
+    case = case_snapshot("case-pass", "登录后获取本人信息", [login_step(), me_step()])
+    dependencies = FakeDependencies(
+        [case],
+        execution_target={
+            "target": "demo",
+            "service_id": "demo",
+            "base_url": None,
+            "environment_version": 2,
+        },
+    )
+    service = service_factory(dependencies)
+    with TestClient(create_runs_app(service)) as client:
+        response = client.post(
+            "/api/projects/project-1/runs",
+            json={"cases": [{"id": "case-pass", "version": 1}], "environment_version": 1},
+        )
+        assert response.status_code == 409
+        assert "环境已变更" in response.json()["detail"]
+        assert not service._futures
+
+
+def test_create_run_accepts_matching_environment_version(demo_server, service_factory):
+    case = case_snapshot("case-pass", "登录后获取本人信息", [login_step(), me_step()])
+    dependencies = FakeDependencies(
+        [case],
+        execution_target={
+            "target": "demo",
+            "service_id": "demo",
+            "base_url": None,
+            "environment_version": 2,
+        },
+    )
+    service = service_factory(dependencies, base_url=demo_server)
+    with TestClient(create_runs_app(service)) as client:
+        response = client.post(
+            "/api/projects/project-1/runs",
+            json={"cases": [{"id": "case-pass", "version": 1}], "environment_version": 2},
+        )
+        assert response.status_code == 202, response.text

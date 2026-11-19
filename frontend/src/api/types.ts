@@ -66,12 +66,12 @@ export interface EnvironmentRead {
   configured_keys: string[]
 }
 
-/** 环境写入请求：demo 只传 secrets；local 另传 service_id 与 base_url */
+/** 环境写入请求：demo 必须带 secrets；local 可省略（无登录的本地服务） */
 export interface EnvironmentWrite {
   target: TargetKind
   service_id?: string | null
   base_url?: string | null
-  secrets: { username: string; password: string }
+  secrets?: { username: string; password: string }
 }
 
 /** 运行批次冻结的执行目标（新批次在创建时冻结） */
@@ -85,6 +85,8 @@ export interface RunTarget {
 /** 发起运行请求 */
 export interface StartRunRequest {
   cases: Array<{ id: string; version: number }>
+  /** 页面展示的环境版本；后端据此校验，环境已变更时拒绝创建批次 */
+  environment_version?: number
 }
 
 /** 发起运行响应（202） */

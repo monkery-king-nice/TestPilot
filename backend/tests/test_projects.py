@@ -393,3 +393,25 @@ def test_agent_failure_keeps_project_and_requirement_usable(settings):
         assert response.status_code == 502
         assert response.json() == {"detail": "模型服务暂不可用"}
         assert client.get(f"/api/projects/{pid}/requirements").json() == [req]
+
+def test_local_environment_can_omit_credentials(client):
+    pid = project(client, "local-no-login")
+    response = client.put(
+        f"/api/projects/{pid}/environment",
+        json={"target": "local", "service_id": "arrow-game", "base_url": "http://127.0.0.1:8030"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "target": "local",
+        "service_id": "arrow-game",
+        "base_url": "http://127.0.0.1:8030",
+        "environment_version": 1,
+        "configured_keys": [],
+    }
+    assert client.get(f"/api/projects/{pid}/environment").json()["configured_keys"] == []
+
+
+def test_demo_environment_requires_credentials(client):
+    pid = project(client, "demo-requires")
+    response = client.put(f"/api/projects/{pid}/environment", json={"target": "demo"})
+    assert response.status_code == 422

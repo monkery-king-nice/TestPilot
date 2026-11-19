@@ -15,12 +15,8 @@ export function describeRequirementVersions(cases) {
 }
 
 export function isEnvironmentConfigured(environment) {
-  return Boolean(
-    environment &&
-      environment.environment_version !== null &&
-      Array.isArray(environment.configured_keys) &&
-      environment.configured_keys.length > 0
-  )
+  // 无登录的本地服务保存后 configured_keys 为空，但有 environment_version 即已配置。
+  return Boolean(environment && environment.environment_version !== null)
 }
 
 export function preflightState({ projectId, confirmedCases, endpoints, environment }) {

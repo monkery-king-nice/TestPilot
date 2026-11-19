@@ -57,11 +57,11 @@ P = `/api/projects/{project_id}`。
 | 曾炜毅 | GET/POST /api/projects | 创建传 {name}，返回 {id,name} |
 | 曾炜毅 | GET/POST P/requirements，PATCH P/requirements/{id} | 创建或修改传 {text}，返回 {id,text,version}；每次修改版本加一 |
 | 曾炜毅 | GET/POST P/endpoints | 创建传 {method,path}，返回 {id,method,path,version}；path 是相对演示服务的路径 |
-| 曾炜毅、周兴宇 | GET/PUT P/environment | demo 写入 {target:"demo",secrets:{username,password}}；local 另传 service_id、base_url。读取仅返回非敏感 {target,service_id,base_url,environment_version,configured_keys}；仅服务端执行器能读取环境值 |
+| 曾炜毅、周兴宇 | GET/PUT P/environment | demo 写入 {target:"demo",secrets:{username,password}}；local 另传 service_id、base_url，无登录的本地服务可省略 secrets。读取仅返回非敏感 {target,service_id,base_url,environment_version,configured_keys}；仅服务端执行器能读取环境值 |
 | 郭泽强 | POST P/agent/clarify | 传 {requirement_id}，返回 {status:"NEEDS_INFO"或"READY",questions:[{quote,question}]}；用户补充答案由前端 PATCH 需求 |
 | 郭泽强 | POST P/agent/generate | 传 {requirement_id}，返回 {drafts:[CaseDraft]}。资料不足返回 422 和原因；Agent 只产出候选 |
 | 沈冠宇 | GET/POST P/cases，PATCH P/cases/{id}，POST P/cases/{id}/confirm | POST/PATCH 传 CaseDraft，返回含 id、version、status 的用例；confirm 传 {version}；前端将选中的候选 POST 一次保存 |
-| 周兴宇 | POST P/runs，GET P/runs/{run_id} | 点击执行后传 {cases:[{id,version}]}，返回 {run_id,status:"QUEUED"}；GET 返回下述 RunDetail |
+| 周兴宇 | POST P/runs，GET P/runs/{run_id} | 点击执行后传 {cases:[{id,version}],environment_version}，返回 {run_id,status:"QUEUED"}；环境版本与当前不一致时返回 409 且不创建批次；GET 返回下述 RunDetail |
 | 郭泽强 | POST P/runs/{run_id}/analysis | 传 {case_id}，仅分析已保存的脱敏结果，返回 {category,reason,evidence:[字符串],suggestion} |
 | 沈冠宇 | GET P/runs/{run_id}/report | 返回可下载的 text/html，基于运行快照，直接用浏览器打开或下载 |
 

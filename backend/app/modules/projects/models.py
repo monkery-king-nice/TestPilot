@@ -122,13 +122,16 @@ class EnvironmentInput(InputModel):
     target: Literal["demo", "local"]
     service_id: str | None = Field(default=None, max_length=100)
     base_url: str | None = Field(default=None, max_length=2048)
-    secrets: EnvironmentSecrets
+    # 本地服务可能没有登录（如桌面游戏适配器），允许不传凭据；演示服务仍必须提供。
+    secrets: EnvironmentSecrets | None = None
 
     @model_validator(mode="after")
     def valid_target(self):
         if self.target == "demo":
             if self.service_id is not None or self.base_url is not None:
                 raise ValueError("演示环境不接受自定义服务标识或地址")
+            if self.secrets is None:
+                raise ValueError("演示环境必须提供用户名和密码")
             return self
         if not self.service_id or not self.service_id.strip():
             raise ValueError("本地测试服务必须提供明确的服务标识")

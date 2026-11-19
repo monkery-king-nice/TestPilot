@@ -22,6 +22,10 @@ class EnvironmentChanged(Exception):
     """The frozen target/version no longer matches the current environment."""
 
 
+class EnvironmentVersionConflict(Exception):
+    """The environment version the client saw no longer matches the current one."""
+
+
 class RunDependencies(Protocol):
     def preflight(self, project_id: str, cases: Sequence[CaseRef]) -> list[dict]:
         """Return frozen case snapshots in request order or raise PreflightRejected.

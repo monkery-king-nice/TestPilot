@@ -84,11 +84,21 @@ async function onRun() {
     const payload = confirmed.value
       .filter((c) => selected.value.includes(c.id))
       .map((c) => ({ id: c.id, version: c.version }))
-    const res = await startRun(projectId(), { cases: payload })
+    const res = await startRun(projectId(), {
+      cases: payload,
+      // 带上页面展示的环境版本：环境在别处被改过时，后端会拒绝创建批次。
+      environment_version: environment.value?.environment_version ?? undefined
+    })
     ElMessage.success(`运行已发起（${res.status}）`)
     router.push(`/projects/${projectId()}/runs/${res.run_id}`)
   } catch (e) {
-    ElMessage.error((e as Error).message || '发起运行失败')
+    const err = e as { status?: number; message?: string }
+    if (err.status === 409) {
+      ElMessage.warning(err.message || '项目测试环境已变更，请刷新后重新确认再执行')
+      await load() // 重新读取环境与版本，用户确认后再点执行
+    } else {
+      ElMessage.error(err.message || '发起运行失败')
+    }
   } finally {
     starting.value = false
   }

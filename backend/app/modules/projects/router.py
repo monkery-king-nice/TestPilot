@@ -159,10 +159,14 @@ def get_environment(project_id: str, repository: Repository):
 
 @router.put("/{project_id}/environment", response_model=EnvironmentView)
 def put_environment(project_id: str, payload: EnvironmentInput, repository: Repository):
-    secrets = {
-        "username": payload.secrets.username.get_secret_value(),
-        "password": payload.secrets.password.get_secret_value(),
-    }
+    secrets = (
+        {}
+        if payload.secrets is None
+        else {
+            "username": payload.secrets.username.get_secret_value(),
+            "password": payload.secrets.password.get_secret_value(),
+        }
+    )
     return repository.put_environment(
         project_id,
         payload.target,

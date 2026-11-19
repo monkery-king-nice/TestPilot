@@ -59,7 +59,7 @@ export async function mockPutEnvironment(projectId: string, write: EnvironmentWr
   mockEnvironment.service_id = write.target === 'local' ? (write.service_id ?? null) : 'demo'
   mockEnvironment.base_url = write.target === 'local' ? (write.base_url ?? null) : 'http://127.0.0.1:8010'
   mockEnvironment.environment_version = (mockEnvironment.environment_version ?? 0) + 1
-  mockEnvironment.configured_keys = Object.keys(write.secrets).sort()
+  mockEnvironment.configured_keys = Object.keys(write.secrets ?? {}).sort()
   return { ...mockEnvironment, configured_keys: [...mockEnvironment.configured_keys] }
 }
 

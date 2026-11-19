@@ -31,6 +31,13 @@ test('环境是否已配置', () => {
   assert.equal(isEnvironmentConfigured(null), false)
 })
 
+test('无登录本地服务（configured_keys 为空但有版本）视为已配置', () => {
+  assert.equal(
+    isEnvironmentConfigured({ ...localEnv, configured_keys: [], environment_version: 1 }),
+    true
+  )
+})
+
 test('运行前检查：三项齐全才 ready', () => {
   const state = preflightState({
     projectId: 'p1',

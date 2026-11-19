@@ -35,15 +35,22 @@ async function onSubmit() {
     ElMessage.warning('本地服务需要填写服务标识与回环地址')
     return
   }
+  const hasCredentials = Boolean(form.username.trim() && form.password.trim())
+  if (form.target === 'demo' && !hasCredentials) {
+    ElMessage.warning('演示服务需要填写用户名和密码')
+    return
+  }
+  // 本地服务可以没有登录：凭据留空时不发送 secrets，后端按无凭据环境保存。
+  const secrets = hasCredentials ? { username: form.username, password: form.password } : undefined
   const write =
     form.target === 'local'
       ? {
           target: 'local' as const,
           service_id: form.serviceId.trim(),
           base_url: form.baseUrl.trim(),
-          secrets: { username: form.username, password: form.password }
+          secrets
         }
-      : { target: 'demo' as const, secrets: { username: form.username, password: form.password } }
+      : { target: 'demo' as const, secrets: secrets! }
   await save(write)
   form.password = ''
 }
@@ -70,7 +77,7 @@ function goRun() {
       </template>
 
       <el-alert
-        title="选择「项目本地服务」时填写被测服务实际启动的回环地址；凭证值保存后不返回前端，仅服务端执行器可读取。"
+        title="选择「项目本地服务」时填写被测服务实际启动的回环地址；没有登录的本地服务可留空凭据。凭证值保存后不返回前端，仅服务端执行器可读取。"
         type="info"
         :closable="false"
         class="mb16"

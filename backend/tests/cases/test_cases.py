@@ -333,3 +333,12 @@ def test_queued_batch_cannot_be_downloaded_as_final_report(client):
     run_id = response.json()["run_id"]
     assert client.get(base + f"/runs/{run_id}/report").status_code == 409
     assert client.get(base + "/runs/missing/report").status_code == 404
+
+def test_report_records_frozen_target(client):
+    base, draft = create_context(client)
+    case = save(client, base, draft, confirm=True)
+    run_id, _ = run_cases(client, base, [case])
+    html = client.get(base + f"/runs/{run_id}/report").text
+    assert "目标：" in html
+    assert "演示服务 demo" in html
+    assert "环境 v1" in html
