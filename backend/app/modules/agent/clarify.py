@@ -1,7 +1,7 @@
 """Requirements clarification. The live path accepts plain requirement text only."""
 import json
 import os
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit
 
@@ -70,8 +70,13 @@ def ask_json(prompt, text, *, max_tokens=2400):
         with urlopen(req, timeout=45) as resp:
             envelope = json.load(resp)
         return json.loads(envelope["choices"][0]["message"]["content"])
-    except (URLError, OSError, KeyError, IndexError, TypeError, ValueError) as exc:
-        raise ModelError("模型调用失败或未返回有效 JSON，请检查服务配置后重试") from exc
+    except HTTPError as exc:
+        exc.close()
+        raise ModelError(f"模型服务返回 HTTP {exc.code}，请核对服务配置后重试") from exc
+    except (URLError, OSError) as exc:
+        raise ModelError("未能连接模型服务，请检查网络后重试") from exc
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise ModelError("模型未返回可用的 JSON，请检查模型名和输出配置后重试") from exc
 
 
 def ask_model(text):
