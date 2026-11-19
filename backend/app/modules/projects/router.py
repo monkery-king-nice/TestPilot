@@ -163,4 +163,10 @@ def put_environment(project_id: str, payload: EnvironmentInput, repository: Repo
         "username": payload.secrets.username.get_secret_value(),
         "password": payload.secrets.password.get_secret_value(),
     }
-    return repository.put_environment(project_id, payload.target, secrets)
+    return repository.put_environment(
+        project_id,
+        payload.target,
+        secrets,
+        service_id=payload.service_id,
+        base_url=payload.base_url,
+    )

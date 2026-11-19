@@ -105,6 +105,11 @@ class StandaloneDependencies:
             selected.append(copy.deepcopy(case))
         return selected
 
+    def read_execution_target(self, project_id: str) -> dict:
+        if project_id != "standalone-project":
+            raise PreflightRejected(["独立演示仅支持项目 standalone-project"])
+        return {"target": "demo", "service_id": "demo", "base_url": None}
+
     def read_environment(self, project_id: str, target: str) -> Mapping[str, str]:
         if target != "demo":
             raise PreflightRejected(["仅允许 demo 目标"])

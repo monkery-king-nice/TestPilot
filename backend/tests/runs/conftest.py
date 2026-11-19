@@ -19,9 +19,14 @@ from demo_service.server import make_server
 class FakeDependencies:
     """Explicit test double for the unmerged cases/project-data modules."""
 
-    def __init__(self, snapshots=(), environment=None):
+    def __init__(self, snapshots=(), environment=None, execution_target=None):
         self.snapshots = {item["case_id"]: item for item in snapshots}
         self.environment = environment or {"username": "demo-user", "password": "local-demo-only"}
+        self.execution_target = execution_target or {
+            "target": "demo",
+            "service_id": "demo",
+            "base_url": None,
+        }
         self.preflight_calls = 0
 
     def preflight(self, project_id: str, cases: list[CaseRef]):
@@ -44,9 +49,15 @@ class FakeDependencies:
             raise PreflightRejected(reasons)
         return selected
 
+    def read_execution_target(self, project_id: str):
+        assert project_id == "project-1"
+        if self.execution_target is None:
+            raise PreflightRejected(["尚未配置项目测试环境"])
+        return copy.deepcopy(self.execution_target)
+
     def read_environment(self, project_id: str, target: str):
         assert project_id == "project-1"
-        assert target == "demo"
+        assert target == self.execution_target["target"]
         return copy.deepcopy(self.environment)
 
 

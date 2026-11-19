@@ -27,5 +27,8 @@ class RunDependencies(Protocol):
         endpoint_id to its frozen {id, method, path, version} object.
         """
 
+    def read_execution_target(self, project_id: str) -> dict:
+        """Return project-owned target metadata or raise PreflightRejected."""
+
     def read_environment(self, project_id: str, target: str) -> Mapping[str, str]:
         """Internal-only secret lookup; returned values must never be persisted."""

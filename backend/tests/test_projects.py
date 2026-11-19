@@ -50,7 +50,12 @@ def test_complete_data_workflow_and_reopen_database(settings):
             response = client.post(f"{base}/endpoints", json={"method": method, "path": path})
             assert response.status_code == 201
             assert response.json()["version"] == 1
-        assert client.get(f"{base}/environment").json() == {"target": "demo", "configured_keys": []}
+        assert client.get(f"{base}/environment").json() == {
+            "target": "demo",
+            "service_id": None,
+            "base_url": None,
+            "configured_keys": [],
+        }
         response = client.put(
             f"{base}/environment",
             json={
@@ -59,7 +64,12 @@ def test_complete_data_workflow_and_reopen_database(settings):
             },
         )
         assert response.status_code == 200
-        assert response.json() == {"target": "demo", "configured_keys": ["password", "username"]}
+        assert response.json() == {
+            "target": "demo",
+            "service_id": "demo",
+            "base_url": None,
+            "configured_keys": ["password", "username"],
+        }
         assert "fixture-password" not in response.text
         assert "fixture-user" not in response.text
     # New app and new DB connections, same file: no fixture or in-memory state.

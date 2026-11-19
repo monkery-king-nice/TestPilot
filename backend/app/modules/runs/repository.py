@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .models import CaseResult, Counts, RunDetail, StepResult
+from .models import CaseResult, Counts, ExecutionTarget, RunDetail, StepResult
 
 
 class RunConflict(Exception):
@@ -43,7 +43,8 @@ class RunRepository:
                     total INTEGER NOT NULL,
                     counts_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    target_json TEXT
                 );
                 CREATE INDEX IF NOT EXISTS runs_active_idx ON runs(status);
                 CREATE TABLE IF NOT EXISTS run_cases (
@@ -68,6 +69,11 @@ class RunRepository:
                 );
                 """
             )
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(runs)")
+            }
+            if "target_json" not in columns:
+                connection.execute("ALTER TABLE runs ADD COLUMN target_json TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=10)
@@ -75,7 +81,9 @@ class RunRepository:
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 
-    def create_run(self, project_id: str, snapshots: list[dict]) -> str:
+    def create_run(
+        self, project_id: str, snapshots: list[dict], target: dict | None = None
+    ) -> str:
         run_id = str(uuid.uuid4())
         now = _now()
         counts = Counts().model_dump()
@@ -88,8 +96,18 @@ class RunRepository:
                 if active:
                     raise RunConflict("已有运行批次正在排队或执行，请等待其结束")
                 connection.execute(
-                    "INSERT INTO runs VALUES (?, ?, 'QUEUED', ?, ?, ?, ?)",
-                    (run_id, project_id, len(snapshots), _json(counts), now, now),
+                    "INSERT INTO runs(run_id, project_id, status, total, counts_json, "
+                    "created_at, updated_at, target_json) "
+                    "VALUES (?, ?, 'QUEUED', ?, ?, ?, ?, ?)",
+                    (
+                        run_id,
+                        project_id,
+                        len(snapshots),
+                        _json(counts),
+                        now,
+                        now,
+                        None if target is None else _json(target),
+                    ),
                 )
                 for position, snapshot in enumerate(snapshots):
                     case_id = snapshot["case_id"]
@@ -189,6 +207,11 @@ class RunRepository:
             run_id=run_id,
             status=run["status"],
             counts=Counts(**json.loads(run["counts_json"])),
+            target=(
+                ExecutionTarget(**json.loads(run["target_json"]))
+                if run["target_json"]
+                else None
+            ),
             results=[CaseResult(**json.loads(row["result_json"])) for row in rows],
         )
 
@@ -208,8 +231,18 @@ class RunRepository:
             "run_id": run_id,
             "project_id": project_id,
             "status": run["status"],
+            "target": json.loads(run["target_json"]) if run["target_json"] else None,
             "cases": [json.loads(row["snapshot_json"]) for row in rows],
         }
+
+    def get_run_target(self, run_id: str) -> dict | None:
+        with self._connect() as connection:
+            run = connection.execute(
+                "SELECT target_json FROM runs WHERE run_id=?", (run_id,)
+            ).fetchone()
+        if run is None:
+            raise RunNotFound("运行批次不存在")
+        return json.loads(run["target_json"]) if run["target_json"] else None
 
     def get_snapshots_for_execution(self, run_id: str) -> list[dict]:
         with self._connect() as connection:

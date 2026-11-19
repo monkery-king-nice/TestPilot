@@ -48,8 +48,15 @@ class CaseResult(BaseModel):
     steps: list[StepResult]
 
 
+class ExecutionTarget(BaseModel):
+    kind: Literal["demo", "local"]
+    service_id: str
+    base_url: str
+
+
 class RunDetail(BaseModel):
     run_id: str
     status: Literal["QUEUED", "RUNNING", "COMPLETED", "INTERRUPTED"]
+    target: ExecutionTarget | None = None
     counts: Counts
     results: list[CaseResult]

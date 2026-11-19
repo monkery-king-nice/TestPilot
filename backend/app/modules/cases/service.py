@@ -213,6 +213,12 @@ class CaseService:
     def read_environment(self, project_id: str, target: str) -> dict[str, str]:
         return self.projects.read_environment(project_id, target)
 
+    def read_execution_target(self, project_id: str) -> dict:
+        try:
+            return self.projects.read_execution_target(project_id)
+        except HTTPException as error:
+            raise PreflightRejected([str(error.detail)]) from error
+
     def add_manual_check(self, project_id, case_id, payload: ManualCheckRequest):
         with self.database.connection(write=True) as connection:
             row = self._row(project_id, case_id, connection)

@@ -35,7 +35,7 @@ class DeterministicExecutor:
     ):
         parsed = urlsplit(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-            raise ValueError("演示目标必须是服务端配置的 HTTP 地址")
+            raise ValueError("测试目标必须是服务端配置的 HTTP 地址")
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.transport = transport
@@ -57,6 +57,7 @@ class DeterministicExecutor:
             timeout=httpx.Timeout(self.timeout_seconds),
             follow_redirects=False,
             transport=self.transport,
+            trust_env=False,
         ) as client:
             for index, step in enumerate(snapshot["steps"]):
                 if stopped:
@@ -172,7 +173,7 @@ class DeterministicExecutor:
                     elapsed_ms=self._elapsed(started),
                     request_summary=request_summary,
                     error_stage="connection",
-                    response_summary="无法连接团队演示服务或响应传输失败",
+                    response_summary="无法连接团队测试服务或响应传输失败",
                 ),
                 {},
                 "BLOCKED" if phase == "setup" else "ERROR",

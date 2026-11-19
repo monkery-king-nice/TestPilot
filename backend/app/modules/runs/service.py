@@ -48,13 +48,31 @@ class RunService:
         snapshots = self.dependencies.preflight(project_id, cases)
         self._validate_snapshots(cases, snapshots)
         snapshots = [{**snapshot, "project_id": project_id} for snapshot in snapshots]
-        run_id = self.repository.create_run(project_id, snapshots)
+        configured = self.dependencies.read_execution_target(project_id)
+        target = self._resolve_target(configured)
+        run_id = self.repository.create_run(project_id, snapshots, target)
         if self.background:
             future = self._pool.submit(self.execute_run, run_id)
             with self._lock:
                 self._futures.add(future)
             future.add_done_callback(self._forget)
         return run_id
+
+    def _resolve_target(self, configured: dict) -> dict:
+        kind = configured.get("target")
+        if kind == "demo":
+            return {
+                "kind": "demo",
+                "service_id": "demo",
+                "base_url": self.settings.demo_base_url,
+            }
+        if kind == "local":
+            service_id = configured.get("service_id")
+            base_url = configured.get("base_url")
+            if not service_id or not base_url:
+                raise PreflightRejected(["项目本地测试服务缺少服务标识或地址"])
+            return {"kind": "local", "service_id": service_id, "base_url": base_url}
+        raise PreflightRejected(["项目测试环境目标无效，不能回退到默认演示服务"])
 
     def _forget(self, future: Future) -> None:
         with self._lock:
@@ -63,12 +81,22 @@ class RunService:
 
     def execute_run(self, run_id: str) -> None:
         self.repository.mark_running(run_id)
+        target = self.repository.get_run_target(run_id)
+        if target is None:
+            # Only runs created before project targets existed retain legacy demo behavior.
+            target = {
+                "kind": "demo",
+                "service_id": "demo",
+                "base_url": self.settings.demo_base_url,
+            }
         snapshots = self.repository.get_snapshots_for_execution(run_id)
         for snapshot in snapshots:
             try:
-                environment = self.dependencies.read_environment(snapshot["project_id"], "demo")
+                environment = self.dependencies.read_environment(
+                    snapshot["project_id"], target["kind"]
+                )
                 executor = DeterministicExecutor(
-                    self.settings.demo_base_url,
+                    target["base_url"],
                     self.settings.request_timeout_seconds,
                     self.transport,
                 )
