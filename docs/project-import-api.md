@@ -102,4 +102,6 @@ $env:TESTPILOT_DATABASE = 'backend/data/project-import-acceptance.sqlite3'
 
 脚本输出 `book-catalog.zip`、`room-schedule.zip`、`http-evidence.json`。只生成上传样本时传 `--samples-only`。
 
+本次实测使用 Windows 和独立 SQLite。先用 `e266aee` 启动并写入旧项目、需求和端点，再用 `9a61edb` 启动同一数据库。旧数据保留，两套 ZIP 均通过真实 HTTP 导入，重启后可重新读取。坏包返回 422，跨项目预览返回 404。后端回归共 105 项通过，其中 9 项覆盖本模块。实际 ID、来源、版本、错误响应与样本校验值收录在 [实测索引](evidence/project-import-http.json)。前端串联、真实模型和正式项目验收由团队后续完成。
+
 协议参考 [Python ZIP 读取](https://docs.python.org/3.13/library/zipfile.html) 和 [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0.html)。

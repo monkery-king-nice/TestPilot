@@ -1,0 +1,160 @@
+{
+  "mode": "real local HTTP API with independent sample projects",
+  "samples": {
+    "book-catalog": {
+      "project": {
+        "id": "e33cf6d6-9305-434f-a3e2-b440eeac4764",
+        "name": "导入验收 book-catalog"
+      },
+      "import": {
+        "id": "86ea00ca-3d0f-4418-b51f-b6adf238e12d",
+        "project_id": "e33cf6d6-9305-434f-a3e2-b440eeac4764",
+        "filename": "book-catalog.zip",
+        "documents": [
+          {
+            "path": "docs/requirements.md",
+            "size": 157
+          }
+        ],
+        "endpoint_candidates": [
+          {
+            "candidate_id": "1",
+            "source_path": "api/openapi.json",
+            "method": "GET",
+            "path": "/books",
+            "requires_manual_registration": false,
+            "summary": "按书名查找图书",
+            "parameters": [
+              {
+                "name": "q",
+                "in": "query",
+                "required": false,
+                "type": "string",
+                "description": "待查询的书名"
+              },
+              {
+                "name": "limit",
+                "in": "query",
+                "required": false,
+                "type": "integer",
+                "description": "返回条数"
+              }
+            ],
+            "responses": [
+              {
+                "status": "200",
+                "description": "成功返回图书列表"
+              }
+            ]
+          }
+        ],
+        "needs_manual_endpoints": false,
+        "warnings": [],
+        "confirmed_endpoints": []
+      },
+      "preview": {
+        "import_id": "86ea00ca-3d0f-4418-b51f-b6adf238e12d",
+        "path": "docs/requirements.md",
+        "start": 0,
+        "end": 69,
+        "total_chars": 69,
+        "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n"
+      },
+      "requirement": {
+        "id": "73b5c092-cd30-4383-9b76-a838e1524323",
+        "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n",
+        "version": 1,
+        "source": {
+          "import_id": "86ea00ca-3d0f-4418-b51f-b6adf238e12d",
+          "path": "docs/requirements.md",
+          "start": 0,
+          "end": 69
+        }
+      },
+      "registered_endpoint": {
+        "id": "36661a1a-d48d-469e-b0de-d0f99ab9a3f3",
+        "method": "GET",
+        "path": "/books",
+        "version": 1
+      },
+      "bad_upload": {
+        "detail": "ZIP 内容损坏或压缩格式不受支持，请重新打包"
+      }
+    },
+    "room-schedule": {
+      "project": {
+        "id": "50ed477d-528c-40fc-89d7-bd1077d79d47",
+        "name": "导入验收 room-schedule"
+      },
+      "import": {
+        "id": "569a4657-356d-4656-a333-2b34fc8db9e6",
+        "project_id": "50ed477d-528c-40fc-89d7-bd1077d79d47",
+        "filename": "room-schedule.zip",
+        "documents": [
+          {
+            "path": "需求.txt",
+            "size": 155
+          }
+        ],
+        "endpoint_candidates": [],
+        "needs_manual_endpoints": true,
+        "warnings": [
+          "未找到可读取的 OpenAPI 3 JSON，请手工登记接口"
+        ],
+        "confirmed_endpoints": []
+      },
+      "preview": {
+        "import_id": "569a4657-356d-4656-a333-2b34fc8db9e6",
+        "path": "需求.txt",
+        "start": 0,
+        "end": 57,
+        "total_chars": 57,
+        "text": "教室预约查询\n\n用户可查询教室的开放时段，成功时返回 200。\n遇到节假日如何展示尚未约定，需要操作者明确规则。\n"
+      },
+      "requirement": {
+        "id": "7e396f5d-468f-46fc-89cd-991c9f951ccc",
+        "text": "教室预约查询\n\n用户可查询教室的开放时段，成功时返回 200。\n遇到节假日如何展示尚未约定，需要操作者明确规则。\n",
+        "version": 1,
+        "source": {
+          "import_id": "569a4657-356d-4656-a333-2b34fc8db9e6",
+          "path": "需求.txt",
+          "start": 0,
+          "end": 57
+        }
+      },
+      "registered_endpoint": {
+        "id": "0ab193cd-87cb-4979-8164-190f2c4c0ffa",
+        "method": "GET",
+        "path": "/rooms",
+        "version": 1
+      },
+      "bad_upload": {
+        "detail": "ZIP 内容损坏或压缩格式不受支持，请重新打包"
+      }
+    }
+  },
+  "cross_project_preview": {
+    "detail": "当前项目中找不到该导入记录"
+  },
+  "tested_commit": "9a61edb82b68e93c9f92f2392714551fccc6b3d1",
+  "legacy_database": {
+    "created_by": "e266aee98653946c31dcd4cd3d45882cbc75374a",
+    "existing_project_id": "a6537132-f0a6-4d32-8ba6-b32d9d126ef4",
+    "requirement_preserved": {
+      "id": "863ab0f9-857c-4518-88dc-fbeeeb17410f",
+      "text": "此需求由旧版本创建",
+      "version": 1
+    },
+    "endpoint_preserved": {
+      "id": "359cf13f-23bf-4ede-abfe-4f6456df8dbd",
+      "method": "GET",
+      "path": "/previous",
+      "version": 1
+    },
+    "new_imports_survived_process_restart": true
+  },
+  "zip_sha256": {
+    "book-catalog": "b117b6172def557ad751a42527babcbd2f8e3f12b93ee3f1a13cc22ff00fc20b",
+    "room-schedule": "5524078bfc3dbb6249432f7d2b5efad6ff48bc583a216142f07e8269e000210f"
+  }
+}
