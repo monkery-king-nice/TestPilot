@@ -1,0 +1,16 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "图书目录", "version": "1.0.0"},
+  "paths": {
+    "/books": {
+      "get": {
+        "summary": "按书名查找图书",
+        "parameters": [
+          {"name": "q", "in": "query", "schema": {"type": "string"}, "description": "待查询的书名"},
+          {"name": "limit", "in": "query", "schema": {"type": "integer"}, "description": "返回条数"}
+        ],
+        "responses": {"200": {"description": "成功返回图书列表"}}
+      }
+    }
+  }
+}
