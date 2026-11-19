@@ -241,6 +241,7 @@ pnpm-debug.log*
 
 # ---- 团队任务说明包（本地开发材料，不入库）----
 /TestPilot-Alpha-六人开发包/
+/TestPilot-第二阶段六人开发包/
 
 # TestPilot local data and private configuration
 .env.*

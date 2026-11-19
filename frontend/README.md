@@ -46,7 +46,8 @@ npm run dev          # 开发服务器 http://127.0.0.1:5173
 ```bash
 npm run build        # 产物 frontend/dist
 npm run typecheck    # vue-tsc --noEmit
-npm test             # 评审样例规则
+npm test             # 评审样例 + 失败分析乱序回归
+npm run test:analysis  # 仅失败分析乱序回归（A→B 切换 / 同用例重试）
 ```
 
 ## Mock 模式与真实联调
@@ -80,7 +81,7 @@ Mock 运行进度按时间推进：发起运行后 `QUEUED → RUNNING → COMPL
 - 真实后端（曾炜毅 environment、沈冠宇 cases/report、周兴宇 runs、郭泽强 analysis）联调后验证字段一致性；样例中的 `req-1/ep-login/ep-me` 需替换为真实 ID。
 - 与周兴宇对齐 RunDetail 的 `counts` 终态与 `results` 顺序、脱敏字段命名。
 - 下载目前由前端拼接 HTML 文本触发（Mock 直接生成；真实后端 GET report 返回 text/html）。
-- **AI 失败分析**：真实模式下按钮禁用并显示「待接入」（后端 analysis 接口上线前）；演示模式保留样例。
+- **AI 失败分析**：真实模式已接入后端 `POST .../runs/{run_id}/analysis`；接口不可用时显示可读原因，统计与当前批次下载不受影响。请求用「请求序号 + 项目/批次/用例」双重校验，A 批次晚到的响应不会显示在 B 批次上（见 `useAnalysisRequest.ts` 与 `useAnalysisRequest.test.ts`）。
 - 详情页轮询：晚到响应会按「轮询令牌 + 批次 ID」丢弃，不会覆盖当前批次；地址中的批次/项目变化时重新加载。
 
 ## 接口约定
