@@ -1,0 +1,72 @@
+{
+  "verified_at_utc": "2026-11-19T02:04:31.309754+00:00",
+  "baseline": "7ccc4e5",
+  "tested_commit": "18feb5990a29bf431136381de0619f2558b4a001",
+  "scope": "同一台Windows机器上的独立源码目录、新虚拟环境、新SQLite文件；不代表第二位同学或第二台电脑复现",
+  "second_person": "待同学独立执行README步骤并回传第一处问题",
+  "checks": [
+    {
+      "check": "Windows PowerShell 5.1三服务启动（零依赖目录）",
+      "result": "PASS",
+      "mode": "VITE_USE_MOCK=false; model disabled",
+      "tools": [
+        "[tool] Python 3.13.15",
+        "[tool] Node.js 24.18.0",
+        "[tool] npm 11.16.0"
+      ],
+      "cwd": "从仓库以外的目录调用脚本，仍按仓库定位资源"
+    },
+    {
+      "check": "真实Vite代理创建项目及需求",
+      "result": "PASS",
+      "project_id": "bc084b29-ab16-4a76-a4a8-781d9c5136fc",
+      "requirement_id": "1400f5eb-c065-411c-bd3d-7bb7e2196e1f",
+      "version": 1,
+      "text": "未登录查询本人信息返回401和UNAUTHORIZED。"
+    },
+    {
+      "check": "禁用模型仍能人工确认、真实执行及下载报告",
+      "result": "PASS",
+      "case_id": "9810c320-1387-46d0-9dcf-e0ff6adb49f8",
+      "case_version": 1,
+      "run_id": "a90dad61-169d-44cc-ade2-8848d467f3dd",
+      "counts": {
+        "PASS": 1,
+        "FAIL": 0,
+        "ERROR": 0,
+        "BLOCKED": 0
+      },
+      "model_api_status": 502
+    },
+    {
+      "check": "停止后仅本次三服务退出，端口全部释放",
+      "result": "PASS"
+    },
+    {
+      "check": "Windows PowerShell 5.1三服务启动（已安装依赖）",
+      "result": "PASS",
+      "mode": "VITE_USE_MOCK=false; model disabled",
+      "tools": [
+        "[tool] Python 3.13.15",
+        "[tool] Node.js 24.18.0",
+        "[tool] npm 11.16.0"
+      ],
+      "cwd": "从仓库以外的目录调用脚本，仍按仓库定位资源"
+    },
+    {
+      "check": "同一数据库重启后ID、需求正文及历史报告保留",
+      "result": "PASS",
+      "project_id": "bc084b29-ab16-4a76-a4a8-781d9c5136fc",
+      "requirement_id": "1400f5eb-c065-411c-bd3d-7bb7e2196e1f",
+      "run_id": "a90dad61-169d-44cc-ade2-8848d467f3dd"
+    },
+    {
+      "check": "缺少Node给出安装及重开终端提示，数据库不变",
+      "result": "PASS"
+    },
+    {
+      "check": "API端口被另一进程占用时拒绝启动，原进程及数据库保留",
+      "result": "PASS"
+    }
+  ]
+}
