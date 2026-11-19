@@ -123,3 +123,21 @@ snapshots: list[dict] = cases_service.preflight(
 4. 接口文档中可展示 `GET P/cases` 的 `NEEDS_INFO/NEEDS_REVIEW` 和对应原因。
 
 保存终端实际输出、两份HTML和acceptance.json；站会如需截图，请截本人实际运行的界面。
+
+## 第二阶段验收：用例过期与历史报告
+
+从仓库根目录运行。脚本会启动独立后端与本地演示服务，使用临时数据库和一次性测试凭证。
+
+```powershell
+$env:PYTHONUTF8 = '1'
+.venv\Scripts\python backend/scripts/verify_cases_reports.py --output-dir artifacts/phase2-review-history
+```
+
+1. 创建需求 v1，确认用例 v1，运行批次 A。打开 `success-report.html`，检查登录和查询两步均为 200，批次为 PASS。
+2. 更新同一需求到 v2，重新读取旧用例。预期返回 `NEEDS_REVIEW` 和需求版本过期原因。把另一条已确认用例排在旧用例前提交，预期整批返回 422，演示服务收到 0 次请求。
+3. 更新同一用例的需求版本、预期依据和断言，保存为 v2 并确认。即使 v2 已确认，提交 v1 的版本号仍会返回 422，演示服务收到 0 次请求。提交 v2 后，批次 B 的两步均为 200，结果为 PASS。
+4. 对照 `review-A-redownload.html` 和 `review-B.html`。再次下载的 A 仍显示原批次 ID、需求 v1、用例 v1、原预期依据和原结果。B 显示新批次 ID、需求 v2、用例 v2 和新预期依据。脚本核对报告可见字段和批次结果，不比较报告生成时间。
+
+`acceptance.json` 记录了项目、需求、用例和 A/B 批次 ID、版本、预期依据、步骤 HTTP 状态及两次拒绝响应。数据库会随脚本退出清除，复测时会生成新的 ID。
+
+以合入 PR #11 的 `7ccc4e5` 为基线，本机真实 HTTP 已验证上述流程。另在 `VITE_USE_MOCK=false` 的独立项目中确认，页面会显示旧用例待复核和过期原因，采用新需求版本并重新确认后可从执行页运行 v2，结果为 PASS。共享验收环境仍待队友复测。
