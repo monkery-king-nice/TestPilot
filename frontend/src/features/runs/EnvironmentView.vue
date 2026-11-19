@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // 环境页：选择执行目标（演示服务或项目已启动的本地服务），保存凭证后只显示字段名。
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useEnvironment } from './composables/useEnvironment'
+import { credentialDecision } from './runContext.mjs'
 import type { TargetKind } from '@/api/types'
 
 const route = useRoute()
@@ -21,7 +22,24 @@ const form = reactive({
   password: ''
 })
 const showPassword = ref(false)
+const noCredentials = ref(false)
 const isLocal = computed(() => form.target === 'local')
+const hasSavedCredentials = computed(() => configuredKeys.value.length > 0)
+
+// 切到演示服务时，「不使用凭据」不适用。
+watch(
+  () => form.target,
+  (value) => {
+    if (value === 'demo') noCredentials.value = false
+  }
+)
+// 勾选「不使用凭据」时清空已输入的凭据，避免误以为会保存。
+watch(noCredentials, (value) => {
+  if (value) {
+    form.username = ''
+    form.password = ''
+  }
+})
 
 onMounted(async () => {
   await load()
@@ -30,29 +48,40 @@ onMounted(async () => {
   form.baseUrl = baseUrl.value ?? ''
 })
 
+const REASON_MESSAGE: Record<string, string> = {
+  'demo-needs-both': '演示服务需要同时填写用户名和密码',
+  'one-missing': '用户名和密码需要同时填写；如果该服务不需要登录，请勾选「不使用凭据」',
+  'clear-needs-choice': '已有保存的凭据。如需清空，请先勾选「不使用凭据」'
+}
+
 async function onSubmit() {
   if (isLocal.value && (!form.serviceId.trim() || !form.baseUrl.trim())) {
     ElMessage.warning('本地服务需要填写服务标识与回环地址')
     return
   }
-  const hasCredentials = Boolean(form.username.trim() && form.password.trim())
-  if (form.target === 'demo' && !hasCredentials) {
-    ElMessage.warning('演示服务需要填写用户名和密码')
+  const decision = credentialDecision({
+    target: form.target,
+    username: form.username,
+    password: form.password,
+    noCredentials: noCredentials.value,
+    hasSavedCredentials: hasSavedCredentials.value
+  })
+  if (!decision.ok) {
+    ElMessage.warning(REASON_MESSAGE[decision.reason ?? ''] ?? '请检查凭据填写')
     return
   }
-  // 本地服务可以没有登录：凭据留空时不发送 secrets，后端按无凭据环境保存。
-  const secrets = hasCredentials ? { username: form.username, password: form.password } : undefined
   const write =
     form.target === 'local'
       ? {
           target: 'local' as const,
           service_id: form.serviceId.trim(),
           base_url: form.baseUrl.trim(),
-          secrets
+          secrets: decision.secrets
         }
-      : { target: 'demo' as const, secrets: secrets! }
+      : { target: 'demo' as const, secrets: decision.secrets! }
   await save(write)
   form.password = ''
+  noCredentials.value = false
 }
 
 function goRun() {
@@ -98,22 +127,38 @@ function goRun() {
           <el-form-item label="回环地址">
             <el-input v-model="form.baseUrl" placeholder="http://127.0.0.1:8080" style="max-width: 320px" />
           </el-form-item>
+          <el-form-item label="凭据">
+            <el-checkbox v-model="noCredentials">该服务不需要登录（不使用凭据）</el-checkbox>
+          </el-form-item>
         </template>
 
         <el-form-item label="用户名">
-          <el-input v-model="form.username" placeholder="被测服务的登录账号（如需要）" style="max-width: 320px" />
+          <el-input
+            v-model="form.username"
+            :disabled="noCredentials"
+            placeholder="被测服务的登录账号（如需要）"
+            style="max-width: 320px"
+          />
         </el-form-item>
         <el-form-item label="密码">
           <el-input
             v-model="form.password"
+            :disabled="noCredentials"
             :type="showPassword ? 'text' : 'password'"
             placeholder="被测服务的登录密码（如需要）"
             style="max-width: 320px"
           >
             <template #append>
-              <el-button @click="showPassword = !showPassword">{{ showPassword ? '隐藏' : '显示' }}</el-button>
+              <el-button :disabled="noCredentials" @click="showPassword = !showPassword">
+                {{ showPassword ? '隐藏' : '显示' }}
+              </el-button>
             </template>
           </el-input>
+        </el-form-item>
+        <el-form-item v-if="isLocal && hasSavedCredentials && !noCredentials" label=" ">
+          <el-text type="info" size="small">
+            已保存凭据：重新填写两项可更新；如需清空，请勾选上方「不使用凭据」。
+          </el-text>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>

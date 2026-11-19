@@ -3,6 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  credentialDecision,
   describeTarget,
   describeRequirementVersions,
   isEnvironmentConfigured,
@@ -76,4 +77,48 @@ test('只缺环境时也能定位到环境页', () => {
   assert.equal(state.ready, false)
   assert.deepEqual(state.missing.map((m) => m.key), ['environment'])
   assert.equal(state.missing[0].path, '/projects/p2/environment')
+})
+
+test('本地服务只填一项凭据时拒绝提交', () => {
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: 'u', password: '', noCredentials: false, hasSavedCredentials: false }),
+    { ok: false, reason: 'one-missing' }
+  )
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: '', password: 'p', noCredentials: false, hasSavedCredentials: false }),
+    { ok: false, reason: 'one-missing' }
+  )
+})
+
+test('已有凭据时留空需要明确选择不使用凭据', () => {
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: '', password: '', noCredentials: false, hasSavedCredentials: true }),
+    { ok: false, reason: 'clear-needs-choice' }
+  )
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: '', password: '', noCredentials: true, hasSavedCredentials: true }),
+    { ok: true, secrets: undefined }
+  )
+})
+
+test('本地服务无凭据可直接保存；填全则带凭据', () => {
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: '', password: '', noCredentials: false, hasSavedCredentials: false }),
+    { ok: true, secrets: undefined }
+  )
+  assert.deepEqual(
+    credentialDecision({ target: 'local', username: 'u', password: 'p', noCredentials: false, hasSavedCredentials: false }),
+    { ok: true, secrets: { username: 'u', password: 'p' } }
+  )
+})
+
+test('演示服务必须同时填写用户名和密码', () => {
+  assert.deepEqual(
+    credentialDecision({ target: 'demo', username: 'u', password: '', noCredentials: false, hasSavedCredentials: false }),
+    { ok: false, reason: 'demo-needs-both' }
+  )
+  assert.deepEqual(
+    credentialDecision({ target: 'demo', username: 'u', password: 'p', noCredentials: false, hasSavedCredentials: false }),
+    { ok: true, secrets: { username: 'u', password: 'p' } }
+  )
 })

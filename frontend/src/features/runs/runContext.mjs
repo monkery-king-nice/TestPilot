@@ -47,3 +47,22 @@ export function preflightState({ projectId, confirmedCases, endpoints, environme
   }
   return { ready: missing.length === 0, missing }
 }
+
+/**
+ * 环境表单的凭据决策：
+ * - demo 必须同时填写用户名和密码；
+ * - local 只填一项时拒绝提交；
+ * - local 已有凭据时，留空必须显式选择「不使用凭据」才允许清空。
+ */
+export function credentialDecision({ target, username, password, noCredentials, hasSavedCredentials }) {
+  const user = (username || '').trim()
+  const pass = (password || '').trim()
+  if (target === 'demo') {
+    if (!user || !pass) return { ok: false, reason: 'demo-needs-both' }
+    return { ok: true, secrets: { username: user, password: pass } }
+  }
+  if (noCredentials) return { ok: true, secrets: undefined }
+  if (Boolean(user) !== Boolean(pass)) return { ok: false, reason: 'one-missing' }
+  if (!user && hasSavedCredentials) return { ok: false, reason: 'clear-needs-choice' }
+  return { ok: true, secrets: user && pass ? { username: user, password: pass } : undefined }
+}
