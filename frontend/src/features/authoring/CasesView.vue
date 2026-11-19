@@ -73,7 +73,9 @@ function newDraft() {
 function generate() {
   return perform(async () => {
     candidates.value = []
-    candidates.value = (await generateCases(project, requirementId.value)).drafts
+    const requirement = selectedRequirement.value
+    if (!requirement) return
+    candidates.value = (await generateCases(project, requirement.id, requirement.version)).drafts
     notice.value = '请逐条核对预期，选择候选编辑并保存。'
   })
 }

@@ -308,6 +308,31 @@ def test_request_and_declared_inflation_limits(client, monkeypatch):
         assert connection.execute("SELECT COUNT(*) FROM project_imports").fetchone()[0] == 0
 
 
+def test_upload_limit_accepts_exactly_40_mib_and_rejects_one_more_byte(client):
+    base = project(client)
+    limit = 40 * 1024 * 1024
+    assert archives.MAX_UPLOAD == router.MAX_UPLOAD == limit
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr("assets.bin", b"")
+        archive.writestr("docs/requirements.md", "需求原文")
+    overhead = len(buffer.getvalue())
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as archive:
+        archive.writestr("assets.bin", b"\0" * (limit - overhead))
+        archive.writestr("docs/requirements.md", "需求原文")
+    data = buffer.getvalue()
+    assert len(data) == limit
+    result = upload(client, base, data)
+    assert result.status_code == 201
+    preview = client.post(base + "/imports/" + result.json()["id"] + "/preview", json={"path": "docs/requirements.md"})
+    assert preview.status_code == 200 and preview.json()["text"] == "需求原文"
+    rejected = upload(client, base, data + b"x")
+    assert rejected.status_code == 413 and "40 MiB" in rejected.json()["detail"]
+    with client.app.state.database.connection() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM project_imports").fetchone()[0] == 1
+
+
 def test_old_database_keeps_existing_rows_and_accepts_import(settings):
     with sqlite3.connect(settings.database_path) as conn:
         conn.executescript("""

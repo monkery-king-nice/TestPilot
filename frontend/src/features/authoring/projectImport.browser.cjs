@@ -1,0 +1,204 @@
+// Real backend/SQLite with projectImport.testserver.py's explicit model substitute.
+const assert = require('node:assert/strict')
+const fs = require('node:fs/promises')
+const path = require('node:path')
+const { chromium } = require('playwright-core')
+
+async function main() {
+  const base = process.env.FRONTEND_URL || 'http://127.0.0.1:5178'
+  const samples = process.env.SAMPLE_DIR
+  if (!samples) throw new Error('Set SAMPLE_DIR to verify_project_imports.py --samples-only output')
+  const output = path.resolve(process.env.EVIDENCE_DIR || 'artifacts/project-import-ui')
+  await fs.mkdir(output, { recursive: true })
+  const browser = await chromium.launch({
+    executablePath: process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true,
+  })
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } })
+  page.setDefaultTimeout(10000)
+  const requests = []
+  page.on('request', request => {
+    if (request.url().includes('/api/') && request.method() !== 'GET') {
+      requests.push({ url: new URL(request.url()).pathname, method: request.method(),
+        body: request.headers()['content-type']?.includes('json') ? request.postDataJSON() : '(ZIP bytes)' })
+    }
+  })
+  async function project(name) {
+    const response = await page.request.post(`${base}/api/projects`, { data: { name } })
+    assert.equal(response.status(), 201)
+    const item = await response.json()
+    await page.goto(`${base}/projects/${item.id}/requirements`)
+    await page.waitForFunction(() => [...document.querySelectorAll('button')]
+      .some(button => button.textContent.includes('上传项目 ZIP') && !button.disabled))
+    return item
+  }
+  const button = name => page.getByRole('button', { name, exact: true })
+  const editor = () => page.getByRole('textbox', { name: '需求原文', exact: true })
+  const upload = name => page.locator('input[accept=".zip"]').setInputFiles(path.join(samples, name))
+  const double = name => button(name).evaluate(element => { element.click(); element.click() })
+  async function selectDocument(label) {
+    await page.locator('.el-select').filter({ has: page.getByRole('combobox', { name: '包内需求文档' }) }).click()
+    await page.getByRole('option', { name: label, exact: true }).click()
+    await button('预览文档').click()
+    await button('作为新需求原文').waitFor()
+    await button('作为新需求原文').click()
+    await page.waitForFunction(() => !!document.querySelector('textarea[aria-label="需求原文"]')?.value)
+  }
+  try {
+    const book = await project('ZIP 图书目录页面验收')
+    await upload('book-catalog.zip')
+    await page.getByText(/已上传 book-catalog.zip/).waitFor()
+    assert.deepEqual(await (await page.request.get(`${base}/api/projects/${book.id}/requirements`)).json(), [])
+    await page.locator('.candidate .el-checkbox').first().click()
+    await double('确认登记所选接口')
+    await page.getByText('已登记', { exact: true }).first().waitFor()
+    await selectDocument('docs/requirements.md')
+    await page.screenshot({ path: path.join(output, '01-zip-document-preview.png'), fullPage: true })
+    await double('保存需求')
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    const reqApi = `${base}/api/projects/${book.id}/requirements`
+    const v1 = (await (await page.request.get(reqApi)).json())[0]
+    assert.equal(v1.version, 1)
+    assert.equal(v1.source.path, 'docs/requirements.md')
+    await page.reload()
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    await page.getByText(/已上传 book-catalog.zip/).waitFor()
+    assert.equal(await editor().inputValue(), v1.text.replace(/\r\n/g, '\n'))
+    const clarifyResponse = page.waitForResponse(response => response.url().endsWith('/agent/clarify'))
+    await double('检查缺项')
+    assert.equal((await clarifyResponse).status(), 200)
+    await page.getByRole('textbox', { name: '补充答案 1', exact: true }).fill('名称为空时返回 422，并说明原因。')
+    await button('预览补充').click()
+    await page.locator('.supplement-preview').getByText(/名称为空时返回 422/).waitFor()
+    await page.screenshot({ path: path.join(output, '02-answers-preview.png'), fullPage: true })
+    await page.getByRole('link', { name: '去测试用例页', exact: true }).click()
+    await page.locator('.el-message-box__headerbtn').click()
+    assert.equal(await page.getByRole('textbox', { name: '补充答案 1', exact: true }).inputValue(), '名称为空时返回 422，并说明原因。')
+    page.once('dialog', dialog => dialog.dismiss())
+    await page.reload().catch(() => {})
+    assert.equal(await page.getByRole('textbox', { name: '补充答案 1', exact: true }).inputValue(), '名称为空时返回 422，并说明原因。')
+    await page.getByRole('link', { name: '去测试用例页', exact: true }).click()
+    await button('保存后离开').click()
+    await page.getByRole('heading', { name: '测试用例', exact: true }).waitFor()
+    await page.getByText(/^v2 ·/).first().waitFor()
+    await page.getByRole('link', { name: '需求管理', exact: true }).click()
+    await page.getByText('已保存版本 v2', { exact: true }).waitFor()
+    await page.reload()
+    await page.getByText('已保存版本 v2', { exact: true }).waitFor()
+    const v2 = (await (await page.request.get(reqApi)).json())[0]
+    assert.equal(v2.id, v1.id)
+    assert.deepEqual(v2.source, v1.source)
+    assert.ok(v2.text.includes('回答：名称为空时返回 422'))
+    assert.ok((await editor().inputValue()).includes('回答：名称为空时返回 422'))
+    await page.screenshot({ path: path.join(output, '03-saved-v2-source.png'), fullPage: true })
+    await editor().fill('保留这份未保存原稿')
+    await page.locator('input[accept=".md,.txt"]').setInputFiles({ name: '另选.txt', mimeType: 'text/plain', buffer: Buffer.from('替换需求') })
+    await button('保留原稿').click()
+    assert.equal(await editor().inputValue(), '保留这份未保存原稿')
+    await page.locator('input[accept=".zip"]').setInputFiles([])
+    await page.locator('input[accept=".zip"]').setInputFiles({ name: '坏包.zip', mimeType: 'application/zip', buffer: Buffer.from('invalid zip') })
+    await page.getByRole('alert').filter({ hasText: /ZIP/ }).last().waitFor()
+    assert.equal(await editor().inputValue(), '保留这份未保存原稿')
+    assert.deepEqual((await (await page.request.get(reqApi)).json())[0], v2)
+    await page.getByRole('link', { name: '测试用例', exact: true }).click()
+    await button('放弃并离开').click()
+    await button('生成候选用例').click()
+    await page.getByText(/接口响应检查（模型替身）/).waitFor()
+    const generation = requests.find(request => request.url.endsWith('/agent/generate'))
+    assert.equal(generation.body.requirement_version, 2)
+    assert.deepEqual(await (await page.request.get(`${base}/api/projects/${book.id}/cases`)).json(), [])
+    const bookWrites = requests.filter(request => request.url.includes(book.id))
+    assert.equal(bookWrites.filter(request => request.url.endsWith('/confirm-endpoints')).length, 1)
+    assert.equal(bookWrites.filter(request => request.url.endsWith('/requirements')).length, 1)
+    assert.equal(bookWrites.filter(request => request.method === 'PATCH').length, 1)
+
+    const room = await project('无 OpenAPI 手工路径验收')
+    await upload('room-schedule.zip')
+    await page.getByText(/已上传 room-schedule.zip/).waitFor()
+    await page.getByText(/请在下方手工登记实际接口/).waitFor()
+    await selectDocument('需求.txt')
+    await button('保存需求').click()
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    await page.locator('.el-select').filter({ has: page.getByRole('combobox', { name: 'HTTP 方法' }) }).click()
+    await page.getByRole('option', { name: 'GET', exact: true }).click()
+    await page.getByRole('textbox', { name: '相对接口路径' }).fill('/rooms')
+    await double('登记接口')
+    await page.getByText('GET /rooms', { exact: true }).waitFor()
+    await button('检查缺项').click()
+    await page.getByRole('textbox', { name: '补充答案 1', exact: true }).fill('旧版本答案，不应覆盖更新')
+    const roomApi = `${base}/api/projects/${room.id}/requirements`
+    const old = (await (await page.request.get(roomApi)).json())[0]
+    const external = await page.request.patch(roomApi + '/' + old.id, { data: { text: '另一位同学保存的新原文', expected_version: 1 } })
+    assert.equal(external.status(), 200)
+    await page.getByRole('link', { name: '去测试用例页', exact: true }).click()
+    await button('保存后离开').click()
+    await page.getByRole('alert').filter({ hasText: /原稿和答案已保留/ }).waitFor()
+    assert.ok(new URL(page.url()).pathname.endsWith('/requirements'))
+    assert.equal(await page.getByRole('textbox', { name: '补充答案 1', exact: true }).inputValue(), '旧版本答案，不应覆盖更新')
+    assert.equal((await (await page.request.get(roomApi)).json())[0].text, '另一位同学保存的新原文')
+    await page.screenshot({ path: path.join(output, '04-stale-answer-preserved.png'), fullPage: true })
+    await button('查看最新需求').click()
+    await button('保留原稿').click()
+    assert.equal(await page.getByRole('textbox', { name: '补充答案 1', exact: true }).inputValue(), '旧版本答案，不应覆盖更新')
+    await button('查看最新需求').click()
+    await button('替换内容').click()
+    await page.getByText('已保存版本 v2', { exact: true }).waitFor()
+    assert.equal(await editor().inputValue(), '另一位同学保存的新原文')
+
+    const manual = await project('缺少文档与长文档验收')
+    await upload('no-docs.zip')
+    await page.getByText(/包内没有可选需求文档/).waitFor()
+    await editor().fill('手工录入需求仍可继续')
+    await button('保存需求').click()
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    await upload('long-doc.zip')
+    await page.getByText(/已上传 long-doc.zip/).waitFor()
+    await page.locator('.el-select').filter({ has: page.getByRole('combobox', { name: '包内需求文档' }) }).click()
+    await page.getByRole('option', { name: 'long.txt', exact: true }).click()
+    await button('预览文档').click()
+    await page.getByText(/当前仅预览部分内容/).waitFor()
+    await page.getByRole('spinbutton', { name: '片段结束字符', exact: true }).fill('16010')
+    await button('预览文档').click()
+    await page.getByRole('alert').filter({ hasText: /16,?000/ }).waitFor()
+    await page.getByRole('spinbutton', { name: '片段起始字符', exact: true }).fill('16000')
+    await button('预览文档').click()
+    await page.waitForFunction(() => document.querySelector('.document-preview')?.textContent === '中'.repeat(10))
+    await button('作为新需求原文').click()
+    await button('保存需求').click()
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    const newRequirementId = new URL(page.url()).searchParams.get('requirement')
+    await page.reload()
+    await page.getByText('已保存版本 v1', { exact: true }).waitFor()
+    assert.equal(await editor().inputValue(), '中'.repeat(10))
+    assert.equal(new URL(page.url()).searchParams.get('requirement'), newRequirementId)
+    const beforeOversize = requests.length
+    await page.locator('input[accept=".zip"]').setInputFiles({ name: '超限.zip', mimeType: 'application/zip', buffer: Buffer.alloc(40 * 1024 * 1024 + 1) })
+    await page.getByRole('alert').filter({ hasText: /ZIP 最多 40 MiB/ }).waitFor()
+    assert.equal(requests.length, beforeOversize)
+    assert.equal(await editor().inputValue(), '中'.repeat(10))
+    await page.screenshot({ path: path.join(output, '05-limits-preserve-source.png'), fullPage: true })
+
+    const large = await project('32.7 MiB 大包回归（合成样本）')
+    const largeZip = path.join(samples, 'large-project.zip')
+    const bytes = (await fs.stat(largeZip)).size
+    assert.ok(bytes > 32 * 1024 * 1024 && bytes < 40 * 1024 * 1024)
+    await upload('large-project.zip')
+    await page.getByText(/已上传 large-project.zip/).waitFor({ timeout: 30000 })
+    await selectDocument('docs/requirements.md')
+    assert.ok((await editor().inputValue()).includes('大包上传回归样本'))
+    await page.screenshot({ path: path.join(output, '06-large-zip-preview.png'), fullPage: true })
+    await fs.writeFile(path.join(output, 'handoff.json'), JSON.stringify({
+      date: new Date().toISOString(), mode: 'real API/SQLite, VITE_USE_MOCK=false, deterministic model substitute',
+      book: { project_id: book.id, requirement_id: v1.id, v1, v2 },
+      room: { project_id: room.id, requirement_id: old.id, expected: 'stale answer returns 409 and preserves current requirement' },
+      manual: { project_id: manual.id, requirement_id: newRequirementId },
+      large: { project_id: large.id, filename: 'large-project.zip', bytes, synthetic: true, preview: 'docs/requirements.md' },
+      leaveChecks: ['close dialog preserves answers', 'cancel reload preserves answers', 'save then leave loads v2', 'discard then leave is explicit'],
+      requests,
+    }, null, 2))
+    console.log('PASS: ZIP → v1 → answers → v2; save/discard/cancel navigation; failed save stays; reload protection; 32.7 MiB synthetic ZIP preview; 40 MiB limit; manual and stale-version regressions')
+  } catch (error) {
+    console.error((await page.locator('body').innerText()).slice(0, 6000))
+    throw error
+  } finally { await browser.close() }
+}
+main().catch(error => { console.error(error); process.exitCode = 1 })
