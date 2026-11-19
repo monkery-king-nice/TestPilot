@@ -56,7 +56,7 @@ def create_app(
     application.state.cases_service = cases
     install_error_handlers(application)
     application.include_router(projects_router)
-    application.include_router(build_agent_router(repository.load_text, provider=agent_provider))
+    application.include_router(build_agent_router(repository.load_text, provider=agent_provider, repository=repository))
     application.include_router(workflow_router)
     application.include_router(cases_router)
     application.include_router(runs_router)
