@@ -9,8 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
-    "test": "node --test src/features/authoring/model.test.js src/features/runs/composables/useAnalysisRequest.test.ts",
-    "test:analysis": "node --test src/features/runs/composables/useAnalysisRequest.test.ts"
+    "test": "node --test src/features/authoring/model.test.js src/features/runs/composables/analysisRequestStore.test.mjs",
+    "test:analysis": "node --test src/features/runs/composables/analysisRequestStore.test.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

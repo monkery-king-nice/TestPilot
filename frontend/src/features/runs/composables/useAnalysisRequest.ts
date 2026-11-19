@@ -1,9 +1,8 @@
-// 失败分析请求的状态与乱序保护。
-// 详情页在 A→B 批次之间会复用组件（同一 case_id），若直接把响应写进分析文本，
-// A 的迟到响应会显示在 B 上。这里用「请求序号 + 请求键（项目/批次/用例）」双重校验：
-// 只有仍属于当前对象、且是最新一次请求的响应，才允许写入。
+// 失败分析请求的 Vue 包装：把纯 JS 状态模块（analysisRequestStore.mjs）映射为响应式 ref。
+// 纯 JS 模块可在 Node 18+ 直接测试，避免测试命令依赖 Node 22 的 TypeScript 支持。
 import { ref, type Ref } from 'vue'
 import type { Analysis } from '@/api/types'
+import { createAnalysisRequestStore, describeAnalysisError } from './analysisRequestStore.mjs'
 
 export interface AnalysisRequestHandle {
   analysis: Ref<Analysis | null>
@@ -16,46 +15,30 @@ export interface AnalysisRequestHandle {
 }
 
 export function useAnalysisRequest(): AnalysisRequestHandle {
+  const store = createAnalysisRequestStore()
   const analysis: Ref<Analysis | null> = ref(null)
   const loading = ref(false)
   const error: Ref<string | null> = ref(null)
-  let seq = 0
-  let currentKey: string | null = null
+
+  function sync() {
+    analysis.value = store.analysis
+    loading.value = store.loading
+    error.value = store.error
+  }
 
   function reset(key: string) {
-    seq++
-    currentKey = key
-    loading.value = false
-    analysis.value = null
-    error.value = null
+    store.reset(key)
+    sync()
   }
 
   async function run(key: string, fetcher: () => Promise<Analysis>) {
-    const mySeq = ++seq
-    currentKey = key
-    loading.value = true
-    error.value = null
-    try {
-      const result = await fetcher()
-      // 已切换批次/用例（或又发起了新请求）：丢弃迟到响应。
-      if (mySeq !== seq || key !== currentKey) return
-      analysis.value = result
-    } catch (e) {
-      if (mySeq !== seq || key !== currentKey) return
-      error.value = describeAnalysisError(e)
-    } finally {
-      // 只有仍是当前请求时才结束 loading，避免把新请求的加载态清掉。
-      if (mySeq === seq && key === currentKey) loading.value = false
-    }
+    const pending = store.run(key, fetcher)
+    sync() // 立刻反映 loading / 清掉旧分析
+    await pending
+    sync()
   }
 
   return { analysis, loading, error, reset, run }
 }
 
-/** 把接口/网络错误转成可读原因。 */
-export function describeAnalysisError(e: unknown): string {
-  if (e instanceof Error && e.message && !/failed to fetch|network ?error|load failed/i.test(e.message)) {
-    return e.message
-  }
-  return '分析服务暂不可用，请稍后重试'
-}
+export { describeAnalysisError }
