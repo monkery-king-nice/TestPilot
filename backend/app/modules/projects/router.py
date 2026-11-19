@@ -16,7 +16,7 @@ from .models import (
     ProjectInput,
     Requirement,
     RequirementCreateInput,
-    RequirementInput,
+    RequirementUpdateInput,
 )
 from .repository import ProjectRepository
 
@@ -65,10 +65,12 @@ def create_requirement(project_id: str, payload: RequirementCreateInput, reposit
 def update_requirement(
     project_id: str,
     requirement_id: str,
-    payload: RequirementInput,
+    payload: RequirementUpdateInput,
     repository: Repository,
 ):
-    return repository.update_requirement(project_id, requirement_id, payload.text)
+    return repository.update_requirement(
+        project_id, requirement_id, payload.text, expected_version=payload.expected_version,
+    )
 
 
 @router.post(

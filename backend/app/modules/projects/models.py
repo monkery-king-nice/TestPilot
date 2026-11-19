@@ -37,6 +37,10 @@ class RequirementInput(InputModel):
         return value  # Preserve source text exactly for Agent quote validation.
 
 
+class RequirementUpdateInput(RequirementInput):
+    expected_version: int | None = Field(default=None, ge=1)
+
+
 class DocumentPreviewInput(InputModel):
     path: str = Field(min_length=1, max_length=512)
     start: int = Field(default=0, ge=0)

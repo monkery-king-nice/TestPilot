@@ -73,6 +73,8 @@ OpenAPI 3 JSON 识别 GET、POST、PUT、PATCH、DELETE、HEAD 和 OPTIONS。候
 
 ### 限额和错误
 
+需求修改 `PATCH P/requirements/{id}` 可传 `{text,expected_version}`。服务端在同一写事务中检查版本，不匹配返回 409 且不保存。补充答案页面应传其所依据的已保存版本，并在冲突时保留原稿供用户复核。原客户端省略 `expected_version` 时保持原有行为。
+
 | 状态 | 处理 |
 | --- | --- |
 | `413` | ZIP 请求体最多 8 MiB，最多 512 个条目，声明展开合计最多 48 MiB。读取正文时逐块检查实际字节，单文件最多 1 MiB。候选最多 256 条。 |

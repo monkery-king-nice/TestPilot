@@ -28,7 +28,7 @@ async function main() {
     })
     await page.goto(`${base}/projects/${project.id}/requirements`)
     await page.getByRole('button', { name: '从文件导入', exact: true }).waitFor()
-    const input = page.locator('input[type=file]')
+    const input = page.locator('input[accept=".md,.txt"]')
     const editor = page.getByRole('textbox', { name: '需求原文', exact: true })
     const save = page.getByRole('button', { name: '保存需求', exact: true })
     const importFile = (name, buffer) => input.setInputFiles({ name, mimeType: 'text/plain', buffer })

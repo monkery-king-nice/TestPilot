@@ -1,0 +1,211 @@
+{
+  "date": "2026-11-19T13:15:29.163Z",
+  "mode": "real API/SQLite, VITE_USE_MOCK=false, deterministic model substitute",
+  "book": {
+    "project_id": "f1ab0928-ed0e-41d9-afa1-37991ff8241c",
+    "requirement_id": "64b2f980-09d8-4472-8762-bcae5a09fd6d",
+    "v1": {
+      "id": "64b2f980-09d8-4472-8762-bcae5a09fd6d",
+      "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n",
+      "version": 1,
+      "source": {
+        "import_id": "41822374-d06a-4b05-b74c-cf1a3655fe81",
+        "path": "docs/requirements.md",
+        "start": 0,
+        "end": 69
+      }
+    },
+    "v2": {
+      "id": "64b2f980-09d8-4472-8762-bcae5a09fd6d",
+      "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n\n\n## 用户补充（基于需求 v1）\n\n引用：按书名检索图书，成功返回 200 和图书列表。\n问题：失败时预期返回什么？\n回答：名称为空时返回 422，并说明原因。",
+      "version": 2,
+      "source": {
+        "import_id": "41822374-d06a-4b05-b74c-cf1a3655fe81",
+        "path": "docs/requirements.md",
+        "start": 0,
+        "end": 69
+      }
+    }
+  },
+  "room": {
+    "project_id": "dcd6dc94-1a2a-4b4c-9264-2755202c5e1b",
+    "requirement_id": "4e823b25-2b5b-47ed-9c11-3bec13e73421",
+    "expected": "stale answer returns 409 and preserves current requirement"
+  },
+  "manual": {
+    "project_id": "cf6095a4-fd13-41c7-a30a-5cc5d365324b",
+    "requirement_id": "01f5667f-14fa-424d-97fe-38b6a0fe9ce6"
+  },
+  "requests": [
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/imports",
+      "method": "POST",
+      "body": "(ZIP bytes)"
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/imports/41822374-d06a-4b05-b74c-cf1a3655fe81/confirm-endpoints",
+      "method": "POST",
+      "body": {
+        "candidate_ids": [
+          "1"
+        ]
+      }
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/imports/41822374-d06a-4b05-b74c-cf1a3655fe81/preview",
+      "method": "POST",
+      "body": {
+        "path": "docs/requirements.md",
+        "start": 0
+      }
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/requirements",
+      "method": "POST",
+      "body": {
+        "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n",
+        "source": {
+          "import_id": "41822374-d06a-4b05-b74c-cf1a3655fe81",
+          "path": "docs/requirements.md",
+          "start": 0,
+          "end": 69
+        }
+      }
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/agent/clarify",
+      "method": "POST",
+      "body": {
+        "requirement_id": "64b2f980-09d8-4472-8762-bcae5a09fd6d",
+        "requirement_version": 1
+      }
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/requirements/64b2f980-09d8-4472-8762-bcae5a09fd6d",
+      "method": "PATCH",
+      "body": {
+        "text": "# 图书目录\n\n按书名检索图书，成功返回 200 和图书列表。\n支持 limit 分页，但当前未说明 limit 的取值范围和超限行为。\n\n\n## 用户补充（基于需求 v1）\n\n引用：按书名检索图书，成功返回 200 和图书列表。\n问题：失败时预期返回什么？\n回答：名称为空时返回 422，并说明原因。",
+        "expected_version": 1
+      }
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/imports",
+      "method": "POST",
+      "body": "(ZIP bytes)"
+    },
+    {
+      "url": "/api/projects/f1ab0928-ed0e-41d9-afa1-37991ff8241c/agent/generate",
+      "method": "POST",
+      "body": {
+        "requirement_id": "64b2f980-09d8-4472-8762-bcae5a09fd6d",
+        "requirement_version": 2
+      }
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/imports",
+      "method": "POST",
+      "body": "(ZIP bytes)"
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/imports/29015da9-619f-4343-a326-777f6b181f38/preview",
+      "method": "POST",
+      "body": {
+        "path": "需求.txt",
+        "start": 0
+      }
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/requirements",
+      "method": "POST",
+      "body": {
+        "text": "教室预约查询\n\n用户可查询教室的开放时段，成功时返回 200。\n遇到节假日如何展示尚未约定，需要操作者明确规则。\n",
+        "source": {
+          "import_id": "29015da9-619f-4343-a326-777f6b181f38",
+          "path": "需求.txt",
+          "start": 0,
+          "end": 57
+        }
+      }
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/endpoints",
+      "method": "POST",
+      "body": {
+        "method": "GET",
+        "path": "/rooms"
+      }
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/agent/clarify",
+      "method": "POST",
+      "body": {
+        "requirement_id": "4e823b25-2b5b-47ed-9c11-3bec13e73421",
+        "requirement_version": 1
+      }
+    },
+    {
+      "url": "/api/projects/dcd6dc94-1a2a-4b4c-9264-2755202c5e1b/requirements/4e823b25-2b5b-47ed-9c11-3bec13e73421",
+      "method": "PATCH",
+      "body": {
+        "text": "教室预约查询\n\n用户可查询教室的开放时段，成功时返回 200。\n遇到节假日如何展示尚未约定，需要操作者明确规则。\n\n\n## 用户补充（基于需求 v1）\n\n引用：教室预约查询\n问题：失败时预期返回什么？\n回答：旧版本答案，不应覆盖更新",
+        "expected_version": 1
+      }
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/imports",
+      "method": "POST",
+      "body": "(ZIP bytes)"
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/requirements",
+      "method": "POST",
+      "body": {
+        "text": "手工录入需求仍可继续"
+      }
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/imports",
+      "method": "POST",
+      "body": "(ZIP bytes)"
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/imports/e9eef569-9974-4aa3-a909-136e6aa885c2/preview",
+      "method": "POST",
+      "body": {
+        "path": "long.txt",
+        "start": 0
+      }
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/imports/e9eef569-9974-4aa3-a909-136e6aa885c2/preview",
+      "method": "POST",
+      "body": {
+        "path": "long.txt",
+        "start": 0,
+        "end": 16010
+      }
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/imports/e9eef569-9974-4aa3-a909-136e6aa885c2/preview",
+      "method": "POST",
+      "body": {
+        "path": "long.txt",
+        "start": 16000,
+        "end": 16010
+      }
+    },
+    {
+      "url": "/api/projects/cf6095a4-fd13-41c7-a30a-5cc5d365324b/requirements",
+      "method": "POST",
+      "body": {
+        "text": "中中中中中中中中中中",
+        "source": {
+          "import_id": "e9eef569-9974-4aa3-a909-136e6aa885c2",
+          "path": "long.txt",
+          "start": 16000,
+          "end": 16010
+        }
+      }
+    }
+  ]
+}

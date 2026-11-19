@@ -181,9 +181,13 @@ class ProjectRepository:
             raise HTTPException(409, "需求版本已变更，请复核关联用例")
         return dict(row)
 
-    def update_requirement(self, project_id: str, requirement_id: str, text: str) -> dict:
+    def update_requirement(
+        self, project_id: str, requirement_id: str, text: str, *, expected_version: int | None = None,
+    ) -> dict:
         with self.database.connection(write=True) as connection:
-            current = self.get_requirement(project_id, requirement_id, connection=connection)
+            current = self.get_requirement(
+                project_id, requirement_id, connection=connection, expected_version=expected_version,
+            )
             version = current["version"] + 1
             connection.execute(
                 "UPDATE requirements SET text=?, version=? WHERE id=? AND project_id=?",
