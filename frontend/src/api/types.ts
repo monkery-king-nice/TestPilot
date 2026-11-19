@@ -54,21 +54,39 @@ export interface Case extends CaseDraft {
   reasons?: string[]
 }
 
-/** 环境读取结果：只返回字段名，不返回值（服务端执行器独享读取） */
+/** 执行目标类型：demo 为团队演示服务，local 为项目已启动的本地服务 */
+export type TargetKind = 'demo' | 'local'
+
+/** 环境读取结果：只返回非敏感目标与字段名（值仅服务端执行器可读） */
 export interface EnvironmentRead {
-  target: 'demo'
+  target: TargetKind
+  service_id: string | null
+  base_url: string | null
+  environment_version: number | null
   configured_keys: string[]
 }
 
-/** 环境写入请求 */
+/** 环境写入请求：demo 必须带 secrets；local 可省略（无登录的本地服务） */
 export interface EnvironmentWrite {
-  target: 'demo'
-  secrets: Record<string, string>
+  target: TargetKind
+  service_id?: string | null
+  base_url?: string | null
+  secrets?: { username: string; password: string }
+}
+
+/** 运行批次冻结的执行目标（新批次在创建时冻结） */
+export interface RunTarget {
+  kind: TargetKind
+  service_id: string
+  base_url: string
+  environment_version: number | null
 }
 
 /** 发起运行请求 */
 export interface StartRunRequest {
   cases: Array<{ id: string; version: number }>
+  /** 页面展示的环境版本；后端据此校验，环境已变更时拒绝创建批次 */
+  environment_version?: number
 }
 
 /** 发起运行响应（202） */
@@ -101,6 +119,8 @@ export interface RunResult {
 export interface RunDetail {
   run_id: string
   status: RunStatus
+  /** 创建批次时冻结的目标；旧批次可能为 null（沿用 demo 行为） */
+  target: RunTarget | null
   counts: {
     PASS: number
     FAIL: number

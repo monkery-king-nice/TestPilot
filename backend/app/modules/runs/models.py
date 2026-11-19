@@ -16,6 +16,8 @@ class CreateRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     cases: list[CaseRef] = Field(min_length=1, max_length=20)
+    # 前端展示环境时看到的版本；提供时由后端在创建批次前校验，避免页面显示 A 却请求 B。
+    environment_version: int | None = Field(default=None, ge=1)
 
 
 class RunAccepted(BaseModel):

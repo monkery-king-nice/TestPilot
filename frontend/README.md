@@ -46,8 +46,9 @@ npm run dev          # 开发服务器 http://127.0.0.1:5173
 ```bash
 npm run build        # 产物 frontend/dist
 npm run typecheck    # vue-tsc --noEmit
-npm test             # 评审样例 + 失败分析乱序回归
+npm test             # 评审样例 + 失败分析乱序 + 执行页目标/运行前检查
 npm run test:analysis  # 仅失败分析乱序回归（A→B 切换 / 同用例重试）
+npm run test:runs      # 仅目标文案、需求版本汇总与运行前检查
 ```
 
 ## Mock 模式与真实联调
@@ -77,7 +78,9 @@ Mock 运行进度按时间推进：发起运行后 `QUEUED → RUNNING → COMPL
 
 ## 未完成 / 待联调项
 
-- 真实模式通过 `GET /api/projects` 获取项目列表；需求、用例和执行之间的数据同步待联调。
+- **测试环境目标（第三阶段）**：环境页支持 `demo`（团队演示服务）与 `local`（项目已启动的本地服务，需 `service_id` + 回环 `base_url`）；保存后显示目标、服务标识、地址与环境版本。RunDetail 的 `target` 来自批次冻结快照，历史批次不会串用项目当前环境。
+- **执行前检查**：执行页同屏显示项目名、执行目标、需求版本与已确认用例；缺接口/环境/确认时给出补充入口（`runContext.mjs`，回归见 `runContext.test.mjs`）。
+- **失败区分**：步骤表的断言差异标注「测试断言失败」，分析接口失败标注「模型分析失败」；环境变更导致的整批 ERROR 显示 `error_stage=environment_changed` 提示。
 - 真实后端（曾炜毅 environment、沈冠宇 cases/report、周兴宇 runs、郭泽强 analysis）联调后验证字段一致性；样例中的 `req-1/ep-login/ep-me` 需替换为真实 ID。
 - 与周兴宇对齐 RunDetail 的 `counts` 终态与 `results` 顺序、脱敏字段命名。
 - 下载目前由前端拼接 HTML 文本触发（Mock 直接生成；真实后端 GET report 返回 text/html）。

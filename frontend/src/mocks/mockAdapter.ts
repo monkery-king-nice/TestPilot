@@ -8,6 +8,7 @@ import type {
   EnvironmentRead,
   EnvironmentWrite,
   RunDetail,
+  RunTarget,
   StartRunRequest,
   StartRunResponse
 } from '@/api/types'
@@ -20,8 +21,14 @@ function delay(ms: number): Promise<void> {
 /** 模拟网络往返延迟 */
 const LATENCY = 250
 
-/** 内存环境配置：只保存字段名（值仅服务端执行器可见） */
-const configuredKeys = new Set<string>(['username', 'password'])
+/** 内存环境配置：只保存非敏感目标与字段名（值仅服务端执行器可见） */
+const mockEnvironment = {
+  target: 'demo' as 'demo' | 'local',
+  service_id: 'demo' as string | null,
+  base_url: 'http://127.0.0.1:8010' as string | null,
+  environment_version: 1 as number | null,
+  configured_keys: ['password', 'username'] as string[]
+}
 
 /** 运行进度：runId -> 启动时间戳 */
 const runStartTimes = new Map<string, number>()
@@ -29,18 +36,31 @@ const runStartTimes = new Map<string, number>()
 /** 单个项目（演示只用一个 project_id） */
 const DEMO_PROJECT_ID = 'proj-demo-0001'
 
+/** 当前内存环境对应的执行目标（运行批次创建时冻结）。 */
+function currentTarget(): RunTarget {
+  return {
+    kind: mockEnvironment.target,
+    service_id: mockEnvironment.service_id ?? 'demo',
+    base_url: mockEnvironment.base_url ?? 'http://127.0.0.1:8010',
+    environment_version: mockEnvironment.environment_version
+  }
+}
+
 export async function mockGetEnvironment(projectId: string): Promise<EnvironmentRead> {
   await delay(LATENCY)
   void projectId
-  return { target: 'demo', configured_keys: [...configuredKeys] }
+  return { ...mockEnvironment, configured_keys: [...mockEnvironment.configured_keys] }
 }
 
 export async function mockPutEnvironment(projectId: string, write: EnvironmentWrite): Promise<EnvironmentRead> {
   await delay(LATENCY)
   void projectId
-  configuredKeys.clear()
-  for (const key of Object.keys(write.secrets)) configuredKeys.add(key)
-  return { target: 'demo', configured_keys: [...configuredKeys] }
+  mockEnvironment.target = write.target
+  mockEnvironment.service_id = write.target === 'local' ? (write.service_id ?? null) : 'demo'
+  mockEnvironment.base_url = write.target === 'local' ? (write.base_url ?? null) : 'http://127.0.0.1:8010'
+  mockEnvironment.environment_version = (mockEnvironment.environment_version ?? 0) + 1
+  mockEnvironment.configured_keys = Object.keys(write.secrets ?? {}).sort()
+  return { ...mockEnvironment, configured_keys: [...mockEnvironment.configured_keys] }
 }
 
 export async function mockGetCases(projectId: string): Promise<Case[]> {
@@ -77,15 +97,18 @@ export async function mockGetRunDetail(projectId: string, runId: string): Promis
     detail = {
       run_id: runId,
       status: 'QUEUED',
+      target: currentTarget(),
       counts: { PASS: 0, FAIL: 0, ERROR: 0, BLOCKED: 0 },
       results: []
     }
   } else if (elapsed < 2600) {
     detail = sampleRunDetailByStatus('RUNNING')
     detail.run_id = runId
+    detail.target = currentTarget()
   } else {
     detail = JSON.parse(JSON.stringify(sampleRunDetail)) as RunDetail
     detail.run_id = runId
+    detail.target = currentTarget()
   }
   return detail
 }
@@ -154,6 +177,13 @@ export function buildHtmlReport(detail: RunDetail): string {
 <body>
   <h1>TestPilot 运行报告</h1>
   <p>批次：<b>${esc(detail.run_id)}</b> · 状态：<b>${esc(detail.status)}</b></p>
+  <p>目标：${
+    detail.target
+      ? `${detail.target.kind === 'local' ? '本地服务' : '演示服务'} <b>${esc(detail.target.service_id)}</b>（${esc(detail.target.base_url)}）${
+          detail.target.environment_version == null ? '' : ` · 环境 v${esc(detail.target.environment_version)}`
+        }`
+      : '<em class="nil">未冻结</em>'
+  }</p>
   <p class="stats">
     <span class="outcome-pass">PASS ${detail.counts.PASS}</span>
     <span class="outcome-fail">FAIL ${detail.counts.FAIL}</span>

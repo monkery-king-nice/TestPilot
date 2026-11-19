@@ -7,7 +7,12 @@ from typing import Sequence
 
 import httpx
 
-from .dependencies import EnvironmentChanged, PreflightRejected, RunDependencies
+from .dependencies import (
+    EnvironmentChanged,
+    EnvironmentVersionConflict,
+    PreflightRejected,
+    RunDependencies,
+)
 from .executor import DeterministicExecutor
 from .models import CaseRef, CaseResult, RunDetail, StepResult
 from .repository import RunRepository
@@ -41,7 +46,12 @@ class RunService:
         if recover_on_start:
             self.repository.recover_interrupted()
 
-    def create_run(self, project_id: str, cases: Sequence[CaseRef]) -> str:
+    def create_run(
+        self,
+        project_id: str,
+        cases: Sequence[CaseRef],
+        environment_version: int | None = None,
+    ) -> str:
         ids = [case.id for case in cases]
         if len(ids) != len(set(ids)):
             raise PreflightRejected(["同一批次不能重复选择同一个用例"])
@@ -49,6 +59,14 @@ class RunService:
         self._validate_snapshots(cases, snapshots)
         snapshots = [{**snapshot, "project_id": project_id} for snapshot in snapshots]
         configured = self.dependencies.read_execution_target(project_id)
+        # 页面展示的环境版本与当前环境不一致时拒绝创建，避免把请求发到用户未确认的服务。
+        if (
+            environment_version is not None
+            and configured.get("environment_version") != environment_version
+        ):
+            raise EnvironmentVersionConflict(
+                "项目测试环境已变更，请刷新页面确认最新环境后重新执行"
+            )
         target = self._resolve_target(configured)
         run_id = self.repository.create_run(project_id, snapshots, target)
         if self.background:

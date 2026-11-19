@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 单条用例的步骤执行明细：阶段、HTTP 状态、耗时、脱敏摘要、断言差异、错误阶段。
+// 单条用例的步骤执行明细：阶段、HTTP 状态、耗时、脱敏摘要、测试断言差异、错误阶段。
 import type { RunStepResult, StepPhase } from '@/api/types'
 
 defineProps<{ steps: RunStepResult[] }>()
@@ -23,6 +23,17 @@ function phaseLabel(phase: StepPhase): string {
 function fmt(v: string | number | null): string {
   return v === null || v === undefined ? '—' : String(v)
 }
+
+const ERROR_STAGE_LABEL: Record<string, string> = {
+  environment_changed: '环境已变更',
+  setup: '准备阶段未通过',
+  test: '测试步骤错误',
+  teardown: '清理阶段错误'
+}
+
+function errorStageLabel(stage: string): string {
+  return ERROR_STAGE_LABEL[stage] ?? stage
+}
 </script>
 
 <template>
@@ -45,14 +56,15 @@ function fmt(v: string | number | null): string {
         <div class="mono">res: {{ fmt(row.response_summary) }}</div>
       </template>
     </el-table-column>
-    <el-table-column label="断言差异 / 错误阶段" min-width="220">
+    <el-table-column label="测试断言（预期 / 实际）与错误阶段" min-width="240">
       <template #default="{ row }">
-        <div v-if="row.assertion_diffs && row.assertion_diffs.length">
+        <template v-if="row.assertion_diffs && row.assertion_diffs.length">
+          <div class="diff-label">测试断言失败</div>
           <div v-for="(d, i) in row.assertion_diffs" :key="i" class="diff">✕ {{ d }}</div>
-        </div>
-        <div v-else class="ok">✓ 无差异</div>
+        </template>
+        <div v-else-if="!row.error_stage" class="ok">✓ 断言通过</div>
         <el-tag v-if="row.error_stage" type="danger" size="small" class="error-stage">
-          {{ row.error_stage }}
+          {{ errorStageLabel(row.error_stage) }}
         </el-tag>
       </template>
     </el-table-column>
@@ -72,6 +84,12 @@ function fmt(v: string | number | null): string {
 .muted {
   color: #6b7280;
   font-size: 12px;
+}
+.diff-label {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 2px;
 }
 .diff {
   color: #dc2626;

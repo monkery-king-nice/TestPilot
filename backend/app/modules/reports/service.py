@@ -33,6 +33,15 @@ def redact_saved_diff(diff: str) -> str:
     return diff
 
 
+def target_text(target) -> str:
+    if not target:
+        return "未冻结目标（旧批次）"
+    kind = "本地服务" if target.get("kind") == "local" else "演示服务"
+    version = target.get("environment_version")
+    suffix = "" if version is None else f" · 环境 v{version}"
+    return f"{kind} {target.get('service_id')}（{target.get('base_url')}）{suffix}"
+
+
 class ReportService:
     def __init__(self, runs: RunService):
         self.runs = runs
@@ -62,7 +71,8 @@ class ReportService:
             '@media print{body{margin:0;max-width:none}section{break-before:auto}}',
             '</style></head><body><h1>TestPilot · 测试报告</h1>',
             f'<p>运行批次：{text(run_id)}<br>项目：{text(project_id)}'
-            f'<br>批次状态：{text(frozen["status"])}</p>',
+            f'<br>批次状态：{text(frozen["status"])}'
+            f'<br>目标：{text(target_text(frozen.get("target")))}</p>',
             '<table><thead><tr><th>用例总数</th><th>PASS 通过</th><th>FAIL 失败</th>'
             '<th>ERROR 错误</th><th>BLOCKED 阻塞</th></tr></thead><tbody>',
             '<tr>' + ''.join(f'<td>{text(n)}</td>' for n in [total, *counts.values()])

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from .dependencies import PreflightRejected
+from .dependencies import EnvironmentVersionConflict, PreflightRejected
 from .models import CreateRunRequest, RunAccepted, RunDetail
 from .repository import RunConflict, RunNotFound
 from .service import RunService
@@ -17,7 +17,11 @@ def _service(request: Request) -> RunService:
 @router.post("", response_model=RunAccepted, status_code=status.HTTP_202_ACCEPTED)
 def create_run(project_id: str, payload: CreateRunRequest, request: Request) -> RunAccepted:
     try:
-        run_id = _service(request).create_run(project_id, payload.cases)
+        run_id = _service(request).create_run(
+            project_id, payload.cases, payload.environment_version
+        )
+    except EnvironmentVersionConflict as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     except PreflightRejected as error:
         raise HTTPException(status_code=422, detail="；".join(error.reasons)) from error
     except RunConflict as error:

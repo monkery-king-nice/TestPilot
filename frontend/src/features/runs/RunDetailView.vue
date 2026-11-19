@@ -6,6 +6,7 @@ import { ElMessage } from 'element-plus'
 import { getReportHtml } from '@/api/runs'
 import type { RunStatus } from '@/api/types'
 import { useRunPolling } from './composables/useRunPolling'
+import { describeTarget } from './runContext.mjs'
 import OutcomeStats from './components/OutcomeStats.vue'
 import CaseResultCard from './components/CaseResultCard.vue'
 
@@ -35,6 +36,13 @@ const statusTag = computed(() => {
 })
 
 const downloading = ref(false)
+
+// 批次目标来自该批次的冻结快照，不读取项目当前环境。
+const targetLabel = computed(() => describeTarget(detail.value?.target ?? null))
+// 环境在批次创建后发生变化时，整批步骤会记录 error_stage=environment_changed。
+const environmentChanged = computed(() =>
+  Boolean(detail.value?.results.some((r) => r.steps.some((s) => s.error_stage === 'environment_changed')))
+)
 
 async function downloadReport() {
   // 点击瞬间固定项目与批次：请求和文件名都用这组值，
@@ -94,6 +102,7 @@ function goEnvironment() {
       <div class="run-head">
         <div>
           <div class="run-id">批次 <span class="mono">{{ detail.run_id }}</span></div>
+          <div class="run-target">目标：{{ targetLabel }}</div>
           <div class="run-status">
             <el-tag :type="statusTag.type" size="large" effect="dark">
               <span v-if="polling" class="spin">⟳</span> {{ statusTag.text }}（{{ detail.status }}）
@@ -104,6 +113,15 @@ function goEnvironment() {
           刷新
         </el-button>
       </div>
+
+      <el-alert
+        v-if="environmentChanged"
+        class="mt12"
+        type="error"
+        :closable="false"
+        show-icon
+        title="环境已变更：本批次按创建时的旧目标记录 ERROR（error_stage=environment_changed），请重新预检后再执行。"
+      />
 
       <OutcomeStats :detail="detail" class="mt16" />
 
@@ -135,6 +153,9 @@ function goEnvironment() {
 .mt16 {
   margin-top: 16px;
 }
+.mt12 {
+  margin-top: 12px;
+}
 .ph-title {
   font-weight: 600;
 }
@@ -146,6 +167,11 @@ function goEnvironment() {
 .run-id {
   font-size: 13px;
   color: #64748b;
+}
+.run-target {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #334155;
 }
 .mono {
   font-family: ui-monospace, Consolas, monospace;
