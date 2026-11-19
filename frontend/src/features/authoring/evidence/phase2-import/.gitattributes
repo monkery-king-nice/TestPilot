@@ -1,0 +1,3 @@
+# Keep the BOM and line endings used by the import samples.
+sample.md -text
+sample.txt -text whitespace=cr-at-eol

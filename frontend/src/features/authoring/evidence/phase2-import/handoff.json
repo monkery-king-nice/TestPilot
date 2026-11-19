@@ -1,0 +1,25 @@
+{
+  "mode": "real API / SQLite, VITE_USE_MOCK=false",
+  "model": "not called",
+  "date": "2026-11-19T02:34:51.300Z",
+  "project_id": "fbe0398e-0593-48fa-8caa-74409288b30e",
+  "requirement_id": "a4c02a02-fbee-4364-8b75-5eb8ed204482",
+  "versions": [
+    {
+      "version": 1,
+      "text": "# 登录需求\n\n正确密码登录返回 200。\n错误密码返回 401。\n查询本人信息返回用户编号。\n"
+    },
+    {
+      "version": 2,
+      "text": "登录需求修订\r\n\r\n正确密码返回 200。\r\n错误密码返回 401，提示凭证错误。  \r\n"
+    }
+  ],
+  "checks": [
+    "MD BOM preview and edit",
+    "manual save and refresh v1",
+    "cancel and confirm replacement",
+    "TXT CRLF manual save and refresh v2",
+    "invalid input preserves draft",
+    "no automatic save or model request"
+  ]
+}
