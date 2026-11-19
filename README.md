@@ -1,109 +1,82 @@
 # TestPilot
-智测领航 TestPilot：面向基础开发者的智能软件测试平台，2026秋软件工程实践团队项目。
 
-项目分为后端（FastAPI + SQLite）与前端（Vue 3 + TypeScript + Element Plus）。以下命令均在仓库根目录运行。
+智测领航：面向基础开发者的智能软件测试平台。当前 main 已接通项目、需求、用例确认、真实执行、HTML 报告和 Agent 接口。
 
-## 目录
+## Windows 推荐启动（真实模式）
 
-- `backend/` — FastAPI + SQLite 后端：项目/需求/接口/环境、用例与预检、确定性执行、HTML 报告、Agent 接入。
-- `frontend/` — Vue 3 + TypeScript + Element Plus 前端；环境、执行与结果页见 [frontend/README.md](frontend/README.md)。
-- `demo_service/` — 本地演示服务，见 [demo_service/README.md](demo_service/README.md)。
-- `docs/` — 接口约定与验收证据。
-
-本分支交付曾炜毅负责的 **后端：项目基础与数据（FR-01、02、03 的 Alpha 约定部分）**。
-项目、需求、接口登记、环境配置可独立运行；已接入主分支现有的需求澄清模块，使用真实需求数据库读取原文。
-本分支新增用例管理、统一预检、人工确认、变更复核、人工检查记录和HTML报告，并将真实执行器接入公共入口。基础数据→保存/确认用例→执行→下载报告已通过真实本机HTTP验证；前端和Agent生成接口仍需团队联调。用例格式、启动与验收步骤见[沈冠宇模块交付说明](backend/app/modules/cases/README.md)。需求澄清的真实模型配置见 [Agent说明](backend/app/modules/agent/README.md)，未配置密钥时该接口返回502，基础数据接口仍可用。
-
-## 启动前端
-
-```bash
-cd frontend
-npm ci
-npm run dev
-```
-
-打开 http://127.0.0.1:5173，进入项目列表。默认使用样例数据，详见 [前端说明](frontend/README.md)。
-
-## 启动后端
-
-Python 3.11+；本机使用 Python 3.13 验证。以下命令均在仓库根目录运行。
-
-Windows PowerShell：
+需要 Python 3.11+、Node.js 18+ 和 npm 8+，首次安装依赖需要网络。以下命令在仓库根目录的 PowerShell 运行，无需激活虚拟环境。
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -r backend/requirements.txt
-.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+# 只检查版本、依赖及端口，不安装、不启动服务
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -Check
+
+# 设置本次登录演示服务的密码，输入时不回显；环境页面使用同一值
+$env:DEMO_PASSWORD = [System.Net.NetworkCredential]::new('', (Read-Host '本地演示密码' -AsSecureString)).Password
+
+# 安装依赖，启动 Vue、平台 API 和登录演示服务；先跳过模型也能验收
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -NoModel
 ```
 
-在浏览器打开 [交互式接口文档](http://127.0.0.1:8000/docs)，或请求 `GET /api/projects`。
-默认数据库为 `backend/data/testpilot.sqlite3`，首次启动自动建表，停止/重启保留数据。
-该路径固定相对于仓库根目录；如需使用其他库，在启动前设置 `$env:TESTPILOT_DATABASE = 'D:\testpilot-data\app.sqlite3'`。
+成功后访问：
 
-Linux/macOS：
+- **真实页面**：[项目列表](http://127.0.0.1:5173/projects)。新库显示“暂无项目”，可以创建自己的项目。
+- **平台 API**：[接口文档](http://127.0.0.1:8000/docs)，[健康检查](http://127.0.0.1:8000/api/health)。
+- **被测登录服务**：`http://127.0.0.1:8010`；这是测试目标，首页404属于正常情况。
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements.txt
-.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
-```
+启动入口显式设置 `VITE_USE_MOCK=false`，复用 `npm ci`、仓库现有的 `npm run dev` 和后端配置。启动完成前会检查 API、演示服务及前端代理。
+在启动终端按 Enter 或 Ctrl+C 停止本次服务，SQLite 数据保留。每台电脑各自保存本机数据库，跨电脑传递复现步骤及脱敏证据。
 
-## 启动前端
-
-前端默认使用内置 Mock，可在后端未启动时独立演示；联调时设置 `VITE_USE_MOCK=false` 经 Vite 开发代理访问 `http://127.0.0.1:8000`。
+### 下次启动及独立空库
 
 ```powershell
-cd frontend
-npm install
-npm run dev   # http://127.0.0.1:5173
+# 已安装依赖时跳过重复安装；DEMO_PASSWORD仍需在当前终端设置
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -SkipInstall -NoModel
+
+# 用另一个文件做独立测试，保留原数据库
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -Database backend/data/repro.sqlite3 -NoModel
 ```
 
-构建与类型检查：`npm run build`、`npm run typecheck`。详见 [frontend/README.md](frontend/README.md)。
+默认数据库为 `backend/data/testpilot.sqlite3`；可通过 `-Database` 或 `TESTPILOT_DATABASE` 指定，仓库相对路径不会随终端所在目录变化。首次建库，后续启动直接使用原文件。
+多个 Python 版本并存时，可传 `-Python python`，也可传目标 Python 可执行文件。启动检查失败会显示具体修复方法，不会自动结束占用端口的进程。
 
-## 创建项目、需求和两个接口
+### 使用真实模型或跳过模型
 
-保持服务运行，在另一个 PowerShell 窗口从仓库根目录执行。
-以下只使用一次性演示凭证；发送 JSON 时显式采用 UTF-8，以兼容 Windows PowerShell。
+运行带 `-NoModel` 的入口时，模型调用明确禁用，页面仍连接真实后端。可手动录入/保存/确认用例，再执行和下载报告；点击模型功能会返回配置错误，按提示补配置后重新启动即可。
+
+要使用真实 DeepSeek，在启动前将密钥设为当前终端环境变量，启动命令省略 `-NoModel`：
 
 ```powershell
-$api = 'http://127.0.0.1:8000/api/projects'
-$body = [Text.Encoding]::UTF8.GetBytes('{"name":"TestPilot演示项目"}')
-$project = Invoke-RestMethod -Method Post -Uri $api -ContentType 'application/json; charset=utf-8' -Body $body
-$p = "$api/$($project.id)"
-$body = [Text.Encoding]::UTF8.GetBytes('{"text":"系统支持登录并返回用户信息"}')
-$requirement = Invoke-RestMethod -Method Post -Uri "$p/requirements" -ContentType 'application/json; charset=utf-8' -Body $body
-Invoke-RestMethod -Method Post -Uri "$p/endpoints" -ContentType 'application/json' -Body '{"method":"POST","path":"/auth/login"}'
-Invoke-RestMethod -Method Post -Uri "$p/endpoints" -ContentType 'application/json' -Body '{"method":"GET","path":"/me"}'
-Invoke-RestMethod -Method Put -Uri "$p/environment" -ContentType 'application/json' -Body '{"target":"demo","secrets":{"username":"demo-user","password":"local-demo-only"}}'
-Invoke-RestMethod -Uri "$p/environment"
+$env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'DeepSeek API Key' -AsSecureString)).Password
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -SkipInstall
 ```
 
-创建项目返回 `201` 和 `{"id":"实际UUID","name":"TestPilot演示项目"}`；创建需求和端点同样返回 `201`。
-环境读取和写入响应均只有 `{"target":"demo","configured_keys":["password","username"]}`，不会回传值。
-未配置环境时 GET 返回 `configured_keys: []`，执行器内部读取会明确拒绝未配置环境。
+密钥不会写入文件或命令参数。其他模型兼容配置见 [Agent说明](backend/app/modules/agent/README.md)。
+纯前端模拟演示由 `VITE_USE_MOCK=true` 控制，样例数据不写入真实 SQLite，不能算真实模式验收；具体切换和手动三终端启动见 [Windows启动与排障](docs/windows-start.md)。
 
-## 验证
+## 复现及验证
+
+[Windows启动与排障](docs/windows-start.md) 包含手动步骤、故障处理、空库保存/重启流程和第二人回传表。
+[第二阶段启动交付说明](docs/phase2-startup-handover.md) 记录基线、实测结果及待验证项。
 
 ```powershell
+# 启动诊断测试，仅使用Python标准库
+python -m unittest discover -s scripts/tests -v
+
+# 在独立源码目录、新虚拟环境和新SQLite中验收三服务，首次需要安装依赖
+python scripts/verify_startup.py --output docs/evidence/phase2-startup.json
+
+# 后端原有回归测试
 .venv\Scripts\python -m pip install -r backend/requirements-dev.txt
 .venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m ruff check backend/app/core backend/app/modules/projects backend/app/main.py backend/scripts backend/tests/test_projects.py
-.venv\Scripts\python backend/scripts/verify_project_data.py --output docs/evidence/project-data-http.json
 ```
 
-最后一项会启动两个独立后端进程，使用临时数据库验证真实 HTTP 调用及进程重启。
-不需要事先启动8000端口，不改动你的演示数据库，不调用外部模型或被测服务。
-已保存的实测结果见 [验收证据](docs/evidence/project-data-http.json)。
+启动验收脚本需要 Windows，先检查5173、8000、8010端口是否空闲。验证真实 Vite 代理、项目/需求持久化、无模型执行和报告、原端口占用进程保留及缺少 Node 的提示；不会向外部模型发请求。
 
-## 队友对接
+## 模块文档
 
-- [Alpha v1 接口约定](docs/api-alpha.md)：路径、字段、状态码和全组约定。
-- [数据库及模块接入说明](docs/backend-integration.md)：共享连接、事务、项目校验、版本查询、Agent 和执行器适配。
-- [个人交付说明](docs/曾炜毅-后端交付说明.md)：职责、验证结果、站会演示、待联调项。
-- [前端交付说明](frontend/README.md)：环境、执行与结果页的启动、Mock 切换与验证。
+- [Alpha接口约定](docs/api-alpha.md)：请求字段、状态码及当前功能边界。
+- [数据库与模块接入](docs/backend-integration.md)：连接、事务、项目归属及版本查询。
+- [用例/预检/报告](backend/app/modules/cases/README.md)、[执行器](backend/app/modules/runs/README.md)。
+- [前端说明](frontend/README.md)、[演示服务说明](demo_service/README.md)。
 
-前端通过 `/api` 请求；Vite 开发代理指向 `http://127.0.0.1:8000`。
-演示服务另行运行，见 [演示服务说明](demo_service/README.md)。执行目标配置为服务端环境变量 `DEMO_BASE_URL`，默认 `http://127.0.0.1:8010`；公开 API 只接受 `target: "demo"`。
-
-当前是本机开发版，没有用户登录/权限体系。项目归属校验用于阻止跨项目引用，不代表用户身份认证。
-环境值仅供服务端读取，保存在本地 SQLite 文件中；数据库、`.env`、日志和真实凭证不得提交。配置示例见 [backend/.env.example](backend/.env.example)，需在终端设置，程序不会自动读取该文件。
+当前是本机开发版，没有多用户身份认证。环境配置公开响应仅返回字段名，实际值保存在本机 SQLite 中；数据库、`.env`、密钥、密码和 token 均不得提交。后端配置示例见 [backend/.env.example](backend/.env.example)。
