@@ -7,7 +7,7 @@ from typing import Sequence
 
 import httpx
 
-from .dependencies import PreflightRejected, RunDependencies
+from .dependencies import EnvironmentChanged, PreflightRejected, RunDependencies
 from .executor import DeterministicExecutor
 from .models import CaseRef, CaseResult, RunDetail, StepResult
 from .repository import RunRepository
@@ -48,13 +48,40 @@ class RunService:
         snapshots = self.dependencies.preflight(project_id, cases)
         self._validate_snapshots(cases, snapshots)
         snapshots = [{**snapshot, "project_id": project_id} for snapshot in snapshots]
-        run_id = self.repository.create_run(project_id, snapshots)
+        configured = self.dependencies.read_execution_target(project_id)
+        target = self._resolve_target(configured)
+        run_id = self.repository.create_run(project_id, snapshots, target)
         if self.background:
             future = self._pool.submit(self.execute_run, run_id)
             with self._lock:
                 self._futures.add(future)
             future.add_done_callback(self._forget)
         return run_id
+
+    def _resolve_target(self, configured: dict) -> dict:
+        kind = configured.get("target")
+        if kind not in {"demo", "local"}:
+            raise PreflightRejected(["项目测试环境目标无效，不能回退到默认演示服务"])
+        if kind == "local" and (
+            not configured.get("service_id") or not configured.get("base_url")
+        ):
+            raise PreflightRejected(["项目本地测试服务缺少服务标识或地址"])
+        environment_version = configured.get("environment_version")
+        if type(environment_version) is not int or environment_version < 1:
+            raise PreflightRejected(["项目测试环境缺少有效版本，请重新保存环境配置"])
+        if kind == "demo":
+            return {
+                "kind": "demo",
+                "service_id": "demo",
+                "base_url": self.settings.demo_base_url,
+                "environment_version": environment_version,
+            }
+        return {
+            "kind": "local",
+            "service_id": configured["service_id"],
+            "base_url": configured["base_url"],
+            "environment_version": environment_version,
+        }
 
     def _forget(self, future: Future) -> None:
         with self._lock:
@@ -63,15 +90,50 @@ class RunService:
 
     def execute_run(self, run_id: str) -> None:
         self.repository.mark_running(run_id)
+        target = self.repository.get_run_target(run_id)
+        legacy_target = target is None
+        if legacy_target:
+            # Only runs created before project targets existed retain legacy demo behavior.
+            target = {
+                "kind": "demo",
+                "service_id": "demo",
+                "base_url": self.settings.demo_base_url,
+                "environment_version": None,
+            }
         snapshots = self.repository.get_snapshots_for_execution(run_id)
+        environment = None
+        environment_error = None
+        try:
+            if not legacy_target and target["environment_version"] is None:
+                raise EnvironmentChanged("批次缺少环境版本，请重新预检并创建运行批次")
+            environment = self.dependencies.read_environment(
+                snapshots[0]["project_id"],
+                target["kind"],
+                expected_version=target["environment_version"],
+            )
+        except EnvironmentChanged as error:
+            environment_error = ("environment_changed", str(error))
+        except Exception:
+            environment_error = (
+                "environment",
+                "测试环境读取失败，未发送任何请求；请检查配置后重新执行",
+            )
+        if environment_error:
+            stage, summary = environment_error
+            for snapshot in snapshots:
+                self.repository.save_case_result(
+                    run_id, self._environment_error_result(snapshot, stage, summary)
+                )
+            self.repository.complete_run(run_id)
+            return
+
+        executor = DeterministicExecutor(
+            target["base_url"],
+            self.settings.request_timeout_seconds,
+            self.transport,
+        )
         for snapshot in snapshots:
             try:
-                environment = self.dependencies.read_environment(snapshot["project_id"], "demo")
-                executor = DeterministicExecutor(
-                    self.settings.demo_base_url,
-                    self.settings.request_timeout_seconds,
-                    self.transport,
-                )
                 result = executor.execute(
                     snapshot,
                     environment,
@@ -86,6 +148,23 @@ class RunService:
                 result = self._internal_error_result(snapshot)
             self.repository.save_case_result(run_id, result)
         self.repository.complete_run(run_id)
+
+    @staticmethod
+    def _environment_error_result(snapshot: dict, stage: str, summary: str) -> CaseResult:
+        return CaseResult(
+            case_id=snapshot["case_id"],
+            title=snapshot["title"],
+            outcome="ERROR",
+            steps=[
+                StepResult(
+                    name=step["name"],
+                    phase=step["phase"],
+                    error_stage=stage,
+                    response_summary=summary,
+                )
+                for step in snapshot["steps"]
+            ],
+        )
 
     @staticmethod
     def _internal_error_result(snapshot: dict) -> CaseResult:

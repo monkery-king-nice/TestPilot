@@ -3,7 +3,7 @@
 from typing import Literal
 from urllib.parse import unquote, urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 
 class InputModel(BaseModel):
@@ -119,10 +119,49 @@ class EnvironmentSecrets(InputModel):
 
 
 class EnvironmentInput(InputModel):
-    target: Literal["demo"]
+    target: Literal["demo", "local"]
+    service_id: str | None = Field(default=None, max_length=100)
+    base_url: str | None = Field(default=None, max_length=2048)
     secrets: EnvironmentSecrets
+
+    @model_validator(mode="after")
+    def valid_target(self):
+        if self.target == "demo":
+            if self.service_id is not None or self.base_url is not None:
+                raise ValueError("演示环境不接受自定义服务标识或地址")
+            return self
+        if not self.service_id or not self.service_id.strip():
+            raise ValueError("本地测试服务必须提供明确的服务标识")
+        self.service_id = self.service_id.strip()
+        if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in self.service_id):
+            raise ValueError("本地测试服务标识不能包含空白或控制字符")
+        if not self.base_url or any(
+            char.isspace() or ord(char) < 32 or ord(char) == 127 for char in self.base_url
+        ):
+            raise ValueError("本地测试服务地址不能为空或包含空白或控制字符")
+        try:
+            parsed = urlsplit(self.base_url)
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("本地测试服务地址或端口无效") from error
+        if (
+            parsed.scheme not in {"http", "https"}
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or port is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError("本地测试服务仅允许带明确端口的回环 HTTP(S) 根地址")
+        self.base_url = self.base_url.rstrip("/")
+        return self
 
 
 class EnvironmentView(BaseModel):
-    target: Literal["demo"] = "demo"
+    target: Literal["demo", "local"] = "demo"
+    service_id: str | None = None
+    base_url: str | None = None
+    environment_version: int | None = None
     configured_keys: list[str]

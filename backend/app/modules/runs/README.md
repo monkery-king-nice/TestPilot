@@ -1,6 +1,52 @@
 # 确定性测试执行模块（周兴宇）
 
-实现 Alpha FR-06、07、08：运行 API、单批互斥、整批预检、冻结快照、单后台worker顺序执行、变量提取、四类结果、证据脱敏和中断恢复。只向服务端配置的 `DEMO_BASE_URL` 发请求；`httpx` 禁用自动跳转，默认超时 3 秒。
+实现 Alpha FR-06、07、08：运行 API、单批互斥、整批预检、冻结快照、单后台worker顺序执行、变量提取、四类结果、证据脱敏和中断恢复。原 `demo` 批次仍使用服务端 `DEMO_BASE_URL`；`local` 批次使用操作者为当前项目明确配置的回环 HTTP(S) 地址。`httpx` 禁用自动跳转和环境代理，默认超时 3 秒。
+
+## 项目级测试服务与冻结目标
+
+环境 PUT 在原 `secrets` 外增加两个可空字段。原演示请求不变：
+
+```json
+{"target":"demo","secrets":{"username":"demo-user","password":"本机填写"}}
+```
+
+项目本地服务请求：
+
+```json
+{
+  "target":"local",
+  "service_id":"service-b",
+  "base_url":"http://127.0.0.1:18082",
+  "secrets":{"username":"本机填写","password":"本机填写"}
+}
+```
+
+`local` 仅允许 `http/https` 的 `127.0.0.1`、`localhost`、`::1`，必须显式端口且只能是根地址；拒绝用户凭证、查询、片段、空白和控制字符。接口登记仍只收相对路径。环境 GET/PUT 返回 `target/service_id/base_url/environment_version/configured_keys`，绝不返回 username、password。首次保存的版本为 1，此后每次完整保存都递增版本，包括目标地址或凭据变化；旧数据库迁移后已有环境从版本 1 开始。
+
+创建批次时通过 `RunDependencies.read_execution_target(project_id)` 读取项目目标，并冻结非敏感快照：
+
+```json
+{"kind":"local","service_id":"service-b","base_url":"http://127.0.0.1:18082","environment_version":1}
+```
+
+- `RunDetail.target` 和内部 `get_frozen_snapshot()` 顶层 `target` 均返回该快照；历史报告应从这里读取，不读取项目当前环境。
+- 新批次缺环境、目标缺字段、环境版本无效或目标类型无效时在创建前返回 422，不创建批次、不发请求，也不回退到 demo。
+- 执行开始前只调用一次内部 `read_environment(project_id, kind, expected_version)`，在同一连接校验目标与版本并读取凭据，整个批次复用这一次读取的内存值。
+- 创建后、执行前若环境被重新保存，目标和版本不再与冻结值匹配，整批直接结束为 ERROR，所有步骤记录 `error_stage=environment_changed`，提示重新预检并创建批次；不会向旧地址或新地址发送任何请求，也不会把 A 的凭据发给 B。
+- 密钥不写入运行快照、报告或证据；配置变更的提示也不包含环境值。仅旧数据库中 `target_json` 为 NULL 的历史批次保留原 demo 执行行为，其公开 `target` 为 null。
+- 跨项目读取批次返回 404；停机记录 `error_stage=connection`，HTTP 状态为 null。
+
+给陈睿涛、沈冠宇的字段契约即 `target.kind/service_id/base_url/environment_version`；预检错误沿用 `{"detail":"原因"}`，目标缺失为 422，环境变更与停机属于已结束批次的 ERROR，不是预检 422。
+
+## 双本地服务真实验证
+
+```powershell
+.venv\Scripts\python backend/tests/runs/project_target_evidence.py --output-dir artifacts/project-target-run-outcomes
+```
+
+脚本启动两个不同端口、返回不同 `user.id` 的真实本机 HTTP 服务，并使用独立临时 SQLite。PASS 选择 B 时，B 收到 `POST /auth/login`、`GET /me`，A 请求数为 0；FAIL 是项目 A 的人为错误 `user.id` 断言；ERROR 来自单独启动后停止的第三个实例。还验证缺环境 422 且不产生运行记录、跨项目 404，以及修改当前环境后历史目标仍为原快照。输出 `evidence.json` 不含密码或 token。正式项目和共享最终批次仍由郭泽强亲自执行。
+
+另运行 `.venv\Scripts\python -m pytest backend/tests/runs/test_target_freezing.py::test_environment_change_never_sends_a_credentials_to_b -q`。该回归让 A、B 使用不同账号密码，在创建 B 的版本 1 批次后切换到 A 的版本 2 配置；旧批次必须以 `environment_changed` 停止，A／B 请求数均为 0，公开结果与冻结快照均不含双方凭据。
 
 ## 从仓库根目录运行（Windows PowerShell）
 
@@ -97,18 +143,18 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/projects/standalone-project/ru
 }
 ```
 
-### 曾炜毅：内部环境读取适配器
+### 项目模块：内部目标与环境读取适配器
 
-`RunDependencies.read_environment(project_id, "demo")` 返回仅服务端可见的 `{username, password}` 字符串映射。不要调用公开 environment GET，也不要把环境值写入 runs 表或日志。目标 URL 只来自服务端 `RunSettings`，不由用例传入。
+`RunDependencies.read_execution_target(project_id)` 返回当前项目的 `{target,service_id,base_url,environment_version}`；缺少配置时抛出 `PreflightRejected`。`RunDependencies.read_environment(project_id, kind, expected_version)` 在同一连接校验目标和冻结版本，并返回仅服务端可见的 `{username,password}` 字符串映射，kind 为 `demo` 或 `local`。每次执行只读取一次并复用内存值；版本变化抛出 `EnvironmentChanged`，不得改读新配置。不要调用公开 environment GET，也不要把环境值写入 runs 表或日志。demo URL 来自服务端 `RunSettings`，local URL 来自项目环境；用例只能提供相对路径。
 
 ### 陈睿涛、沈冠宇、郭泽强：结果与快照读取
 
-- 前端轮询 `GET /api/projects/{project_id}/runs/{run_id}`，响应严格为 RunDetail。
+- 前端轮询 `GET /api/projects/{project_id}/runs/{run_id}`，响应严格为 RunDetail，含可空 `target`。
 - 报告和 AI 分析可调用 `RunService.get_run(project_id, run_id)` 获取同一份脱敏冻结结果。
-- 报告另用 `RunService.get_frozen_snapshot(project_id, run_id)` 读取需求依据、版本和端点快照；该内部接口不经过 HTTP。
+- 报告另用 `RunService.get_frozen_snapshot(project_id, run_id)` 读取需求依据、版本、端点和顶层目标快照；该内部接口不经过 HTTP。配置变更后仍须读取这里的 `target`，不得替换为项目当前环境。
 
-生产后端合入时，由 `backend/app/main.py` 注册 `runs.router`，并将真实适配器构造为 `app.state.run_service`；`standalone.py` 仅用于公共模块未合入时的演示，不应作为生产入口。
+生产后端已由 `backend/app/main.py` 注册真实项目、用例、执行和报告路由；`standalone.py` 仅用于保留独立登录演示。
 
 ## 尚未联调项
 
-真实 `modules/cases` 预检、真实项目/环境数据库函数、HTML 报告和 AI 分析尚未合并，当前使用明确标注的测试替身。演示服务的 PASS/FAIL/BLOCKED 是真实 HTTP 验证；超时、禁止跳转和单批冲突使用可控本地替身验证。
+真实项目 ZIP、正式项目名称和启动方式仍待队长提供；前端环境配置、历史目标展示与正式页面操作由陈睿涛和郭泽强联调。当前分支的 PASS/FAIL/停机 ERROR 是真实本机 HTTP 验证，不冒充正式项目验收；超时、禁止跳转和单批冲突继续使用可控本地替身验证。

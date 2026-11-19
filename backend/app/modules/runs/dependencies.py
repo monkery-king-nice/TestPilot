@@ -18,6 +18,10 @@ class PreflightRejected(Exception):
         super().__init__("；".join(self.reasons))
 
 
+class EnvironmentChanged(Exception):
+    """The frozen target/version no longer matches the current environment."""
+
+
 class RunDependencies(Protocol):
     def preflight(self, project_id: str, cases: Sequence[CaseRef]) -> list[dict]:
         """Return frozen case snapshots in request order or raise PreflightRejected.
@@ -27,5 +31,10 @@ class RunDependencies(Protocol):
         endpoint_id to its frozen {id, method, path, version} object.
         """
 
-    def read_environment(self, project_id: str, target: str) -> Mapping[str, str]:
-        """Internal-only secret lookup; returned values must never be persisted."""
+    def read_execution_target(self, project_id: str) -> dict:
+        """Return project-owned target metadata or raise PreflightRejected."""
+
+    def read_environment(
+        self, project_id: str, target: str, expected_version: int | None = None
+    ) -> Mapping[str, str]:
+        """Atomically validate and read secrets; never persist returned values."""
