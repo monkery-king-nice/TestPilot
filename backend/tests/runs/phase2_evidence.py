@@ -15,6 +15,7 @@ import sys
 import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import httpx
@@ -33,6 +34,35 @@ REQUIREMENT_TEXT = (
     "正确密码登录返回200和非空token，查询本人返回demo-user；"
     "错误密码返回401和INVALID_CREDENTIALS。"
 )
+
+
+@contextmanager
+def loopback_no_proxy():
+    """Bypass ambient proxies for local targets and restore the process env."""
+    names = ("NO_PROXY", "no_proxy")
+    previous = {name: os.environ.get(name) for name in names}
+    for name in names:
+        entries = [item.strip() for item in (previous[name] or "").split(",") if item.strip()]
+        entries.extend(host for host in ("127.0.0.1", "localhost") if host not in entries)
+        os.environ[name] = ",".join(entries)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+@contextmanager
+def temporary_sqlite_directory():
+    """Release sqlite finalizers before cleanup on success and failure."""
+    with tempfile.TemporaryDirectory(prefix="testpilot-phase2-runs-") as temp:
+        try:
+            yield temp
+        finally:
+            gc.collect()
 
 
 def call(client, method, path, payload=None, status=200):
@@ -225,7 +255,7 @@ def verify(output_dir: Path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        with tempfile.TemporaryDirectory(prefix="testpilot-phase2-runs-") as temp:
+        with loopback_no_proxy(), temporary_sqlite_directory() as temp:
             settings = Settings(
                 database_path=Path(temp) / "active.sqlite3",
                 demo_base_url=f"http://127.0.0.1:{server.server_port}",
@@ -288,9 +318,6 @@ def verify(output_dir: Path):
                 assert item["steps"][0]["error_stage"] == "connection"
                 observations.append(item)
 
-            # RunRepository historically relies on sqlite3 object finalizers;
-            # collect them before Windows removes the temporary WAL database.
-            gc.collect()
             evidence = {
                 "transport": "平台API使用TestClient；被测登录服务使用真实本机HTTP",
                 "database": "两个独立临时SQLite数据库，退出后清除",
