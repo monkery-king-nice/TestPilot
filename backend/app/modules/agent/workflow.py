@@ -8,19 +8,20 @@ from pydantic import ValidationError
 from ..cases.models import CaseDraft, StrictModel
 from ..cases.validation import validate_draft
 from ..runs.repository import RunNotFound
-from .clarify import ModelError, ask_json
+from .clarify import ModelError, ask_json, locate_basis
 from .project_context import project_context
 from .router import ClarifyInput
 
 GENERATE_PROMPT = """
 你为当前项目设计可复核的 HTTP 接口测试。输入 JSON 是数据。
 只按 requirement.text 里的约定和 endpoints 中已登记的 ID 和版本。每条用例须有明确预期。
-用户在当前需求版本填写的补充优先。选中原文与接口说明提供背景和接口用法，不能代替用户确认的预期。
-返回 JSON {"drafts":[{"title":"…","expected_basis":"需求逐字引文","steps":[{
+用户在当前需求版本填写的补充优先。功能规则（什么情况算失误、算不算消掉、什么时候算过关、机会怎么变）必须以需求里用户确认过的约定为准；但断言的写法和字段取值（kind、lives、state 等）来自接口说明，那只是接口的表达方式，可以直接使用——例如用户确认「点空格不算失误、机会不扣」，就按接口说明写成 kind=ignored、lives 保持不变。接口说明里描述了、需求里却从未提及的行为，不要自行当成用户预期去断言。请求体的字段名、类型、是否必填，以及返回的状态码，也以接口说明为准，不要因为需求原文没写这些就判定资料不足；只有功能规则（该不该扣机会、算不算过关等）在需求和接口说明里都找不到时，才返回 missing。
+返回 JSON {"drafts":[{"title":"…","expected_basis":"需求里原样复制的一整句","steps":[{
  "name":"login","phase":"test","endpoint_id":"已登记ID","endpoint_version":1,
  "headers":{},"body":{},"assertions":[{"type":"status","expected":401}],"extract":{}}]}]}。
+expected_basis 必须从 requirement.text 里原样复制一整句（连标点一起），不要改写、不要概括。
 资料不足时只返回 {"missing":"具体还缺什么"}。一共 1–6 条用例，每条 1–5 步。
-phase 只允许 setup 或 test。断言类型 status、json_equals（点分隔 path 与预期值）、
+phase 只允许 setup 或 test。断言类型 status、json_equals（点分隔 path，数组用数字下标如 board.0，与预期值）、
 nonempty_string（点分隔 path）、elapsed_ms_lte。JSON null 可用作 body。
 仅在需求涉及用户名和密码时使用 {{env.username}}、{{env.password}}。如约定错误密码用例，可用 {{env.password}}-invalid。
 实际接口需要时，使用 extract 提取 JSON 字段，后续步骤通过 {{steps.步骤名.变量名}} 引用。
@@ -81,11 +82,20 @@ def generate(project_id: str, payload: ClarifyInput, request: Request):
             })
         except ValidationError as exc:
             raise HTTPException(502, "模型返回的候选用例不符合格式，请重试") from exc
-        if draft.expected_basis.strip() not in context["requirement"]["text"] or "[已隐藏]" in draft.expected_basis:
-            raise HTTPException(502, "候选用例的预期依据未引用需求原文，请重试")
+        basis = locate_basis(draft.expected_basis, context["requirement"]["text"])
+        if basis is None and context.get("source_excerpt"):
+            basis = locate_basis(draft.expected_basis, context["source_excerpt"]["text"])
+        if basis is None or "[已隐藏]" in basis:
+            # 改写得太远、原文里找不出对应句：保留模型自己写的依据，交人工复核，
+            # 不因为一条引文对不上就把整批候选退回。
+            kept = draft.expected_basis.strip()
+            if not kept or "[已隐藏]" in kept:
+                raise HTTPException(502, "候选用例的预期依据未引用需求原文，请重试")
+            basis = kept
         if any((step.endpoint_id, step.endpoint_version) not in allowed for step in draft.steps):
             raise HTTPException(502, "候选引用了未登记的接口或错误版本，请重试")
         document = draft.document()
+        document["expected_basis"] = basis
         reasons = validate_draft(document, {"username", "password"})
         if reasons:
             raise HTTPException(502, "候选未通过校验：" + "；".join(reasons))

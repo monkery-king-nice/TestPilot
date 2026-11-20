@@ -8,6 +8,7 @@ export type Endpoint = { id: string; method: string; path: string; version: numb
 export type Clarification = {
   status: 'NEEDS_INFO' | 'READY'
   questions: { quote: string; question: string; source_path?: string }[]
+  dropped?: number
 }
 export type ImportCandidate = {
   candidate_id: string; source_path: string; method: string; path: string; summary: string

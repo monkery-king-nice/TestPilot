@@ -170,3 +170,27 @@ def test_full_field_template_preserves_object_and_array():
     assert rendered == {"payload": {"ids": [1, 2], "enabled": True}}
     assert isinstance(rendered["payload"], dict)
     assert isinstance(rendered["payload"]["ids"], list)
+
+
+def test_json_equals_supports_array_index_in_path():
+    """响应里的数组字段要能用 board.0 断言，不能被误判成字段不存在。"""
+    from app.modules.runs.executor import DeterministicExecutor, _MISSING
+
+    body = {
+        "kind": "blocked", "lives": 2, "state": "playing",
+        "board": ["R.U", "..."], "nested": {"rows": ["ab", "cd"]},
+    }
+    assert DeterministicExecutor._path(body, "board.0") == "R.U"
+    assert DeterministicExecutor._path(body, "board.1") == "..."
+    assert DeterministicExecutor._path(body, "nested.rows.1") == "cd"
+    assert DeterministicExecutor._path(body, "kind") == "blocked"
+    assert DeterministicExecutor._path(body, "board.9") is _MISSING
+    assert DeterministicExecutor._path(body, "board.x") is _MISSING
+    assert DeterministicExecutor._path(body, "kind.sub") is _MISSING
+    diffs = DeterministicExecutor._assertions(
+        DeterministicExecutor.__new__(DeterministicExecutor),
+        [{"type": "json_equals", "path": "board.0", "expected": "R.U"},
+         {"type": "json_equals", "path": "lives", "expected": 2}],
+        200, body, 10, set(),
+    )
+    assert diffs == []

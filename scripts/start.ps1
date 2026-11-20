@@ -3,6 +3,7 @@ param(
     [switch]$Check,
     [switch]$SkipInstall,
     [switch]$NoModel,
+    [switch]$NoDemo,
     [string]$Database = '',
     [string]$Python = ''
 )
@@ -25,6 +26,7 @@ $options = @($scriptFile)
 if ($Check) { $options += '--check' }
 if ($SkipInstall) { $options += '--skip-install' }
 if ($NoModel) { $options += '--no-model' }
+if ($NoDemo) { $options += '--no-demo' }
 if ($Database) { $options += @('--database', $Database) }
 $executable = $launcher[0]
 if ($launcher.Length -gt 1) { $options = @($launcher[1]) + $options }

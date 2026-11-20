@@ -53,6 +53,29 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -SkipI
 密钥不会写入文件或命令参数。其他模型兼容配置见 [Agent说明](backend/app/modules/agent/README.md)。
 纯前端模拟演示由 `VITE_USE_MOCK=true` 控制，样例数据不写入真实 SQLite，不能算真实模式验收；具体切换和手动三终端启动见 [Windows启动与排障](docs/windows-start.md)。
 
+## 完整实测演示（推荐路径）
+
+仓库自带一个「被测小游戏」示例，clone 下来就能把「上传项目 → 功能追问 → 生成用例 → 执行 → 报告」完整走一遍，不用自己另外准备项目。详见 [示例项目说明](examples/arrow-game/README.md) 与 [从空白到 5 PASS 的操作清单](docs/quickstart-demo.md)。
+
+每台电脑各自需要准备（仓库无法代劳）：Python 3.11+、Node.js 18+、npm 8+，首次启动需联网装依赖；想让平台自动追问和生成用例，需要自己的 DeepSeek API Key；端口 5173、8000、18085 要空闲。没有 Key 也能启动、手动写用例并执行，加 `-NoModel` 即可。
+
+**终端 1 —— 起被测小游戏**（仓库根目录）：
+
+```powershell
+python examples/arrow-game/arrow_game_http.py examples/arrow-game/一箭又一箭_测试需求简版.zip --port 18085
+```
+
+**终端 2 —— 起平台**：
+
+```powershell
+$env:DEEPSEEK_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'DeepSeek API Key' -AsSecureString)).Password
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1 -NoDemo
+```
+
+第二次启动可加 `-SkipInstall`。`-NoDemo` 跳过平台自带的 8010 登录演示服务，因此不用设 `DEMO_PASSWORD`；它只影响启动脚本，不改数据库和页面。不带 `-NoDemo` 时行为与原来完全一致。看到 `[READY] frontend: http://127.0.0.1:5173/projects` 后打开网页即可。
+
+若提示 `Node.js was not found`，先确认 `node -v` 能执行；装在非标准位置时，把该目录临时加进 `$env:Path` 再启动。
+
 ## 复现及验证
 
 [Windows启动与排障](docs/windows-start.md) 包含手动步骤、故障处理、空库保存/重启流程和第二人回传表。

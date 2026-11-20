@@ -75,7 +75,7 @@ def validate_draft(draft: dict, environment_keys: set[str]) -> list[str]:
                     reasons.append(f"{prefix}：预期耗时上限必须是非负有限数字")
             elif kind in {"json_equals", "nonempty_string"}:
                 if not PATH.fullmatch(assertion.get("path") or ""):
-                    reasons.append(f"{prefix}：字段路径仅支持点分隔的对象键")
+                    reasons.append(f"{prefix}：字段路径仅支持点分隔的对象键或数组下标")
                 if kind == "json_equals" and "expected" not in assertion:
                     reasons.append(f"{prefix}：缺少字段预期值")
             else:

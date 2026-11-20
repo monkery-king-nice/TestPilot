@@ -263,6 +263,8 @@ function reloadEndpoints() {
               :disabled="working" @input="supplementPreview = ''" />
           </li>
         </ol>
+        <el-alert v-if="clarification.dropped" type="info" :closable="false" show-icon
+          :title="'另有 ' + clarification.dropped + ' 条追问的引用无法在原文中定位，已略去（可精简需求后重试）'" />
         <div v-if="clarification.questions.length" class="controls">
           <el-button :disabled="working || !answers.some(answer => answer.trim())" @click="previewSupplement">预览补充</el-button>
           <el-button type="primary" :disabled="working || conflict || !answers.some(answer => answer.trim())" @click="saveSupplement">保存补充为新版本</el-button>

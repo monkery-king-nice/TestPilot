@@ -275,11 +275,23 @@ class DeterministicExecutor:
 
     @staticmethod
     def _path(document: Any, path: str) -> Any:
+        """按点分隔路径取值；对象用键名，数组用数字下标（如 board.0）。
+
+        断言路径的格式校验允许数字段，模型也常写 board.0 去检查数组第一项，
+        执行器必须同样支持，否则会把本来正确的响应误报成「字段不存在」。
+        """
         current = document
         for key in path.split("."):
-            if not isinstance(current, dict) or key not in current:
+            if isinstance(current, dict):
+                if key not in current:
+                    return _MISSING
+                current = current[key]
+            elif isinstance(current, (list, tuple)):
+                if not key.isdigit() or int(key) >= len(current):
+                    return _MISSING
+                current = current[int(key)]
+            else:
                 return _MISSING
-            current = current[key]
         return current
 
     def _assertions(

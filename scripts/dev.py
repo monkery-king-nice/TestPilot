@@ -218,8 +218,10 @@ def node_tools():
     return node, str(npm_cli)
 
 
-def check_ports():
+def check_ports(*, skip_demo=False):
     for name, port in PORTS.items():
+        if skip_demo and name == "demo":
+            continue
         with socket.socket() as listener:
             if os.name == "nt":
                 listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
@@ -308,6 +310,11 @@ def main(argv=None):
         "--no-model", action="store_true", help="disable model calls; use manually confirmed cases"
     )
     parser.add_argument(
+        "--no-demo",
+        action="store_true",
+        help="skip the local demo login service (8010); for local targets that need no credentials",
+    )
+    parser.add_argument(
         "--database", default=os.getenv("TESTPILOT_DATABASE", "backend/data/testpilot.sqlite3")
     )
     args = parser.parse_args(argv)
@@ -317,7 +324,7 @@ def main(argv=None):
         )
     say(f"[tool] Python {sys.version.split()[0]}")
     node, npm_cli = node_tools()
-    check_ports()  # Before installations, password prompts, or database writes.
+    check_ports(skip_demo=args.no_demo)  # Before installations, password prompts, or database writes.
     python = venv_python()
     frontend_ready = (ROOT / "frontend/node_modules/vite/bin/vite.js").is_file()
     backend_ready = installed(python)
@@ -333,7 +340,10 @@ def main(argv=None):
     say(
         f"[database] {'existing file, preserved' if database.exists() else 'new file will be created at service startup'}"
     )
-    say("[mode] REAL: VITE_USE_MOCK=false; browser /api -> local API -> local demo")
+    say(
+        "[mode] REAL: VITE_USE_MOCK=false; browser /api -> local API"
+        + (" -> local demo" if not args.no_demo else " (demo service skipped, local target only)")
+    )
     if args.check:
         say(
             "[check] PASS. Run scripts/start.ps1 to install dependencies and start all three services."
@@ -343,19 +353,21 @@ def main(argv=None):
         raise StartError(
             "Local dependencies are missing. Retry without -SkipInstall, or run the manual install commands in README.md."
         )
-    password = os.getenv("DEMO_PASSWORD")
-    if not password:
-        if not sys.stdin.isatty():
-            raise StartError(
-                "Set DEMO_PASSWORD in this terminal before starting (see the secure Read-Host example in README.md)."
-            )
-        password = getpass.getpass(
-            "Local demo password (hidden; use the same value in the environment page): "
-        )
+    password = None
+    if not args.no_demo:
+        password = os.getenv("DEMO_PASSWORD")
         if not password:
-            raise StartError(
-                "The local demo password must not be empty. Set DEMO_PASSWORD and retry."
+            if not sys.stdin.isatty():
+                raise StartError(
+                    "Set DEMO_PASSWORD in this terminal before starting (see the secure Read-Host example in README.md)."
+                )
+            password = getpass.getpass(
+                "Local demo password (hidden; use the same value in the environment page): "
             )
+            if not password:
+                raise StartError(
+                    "The local demo password must not be empty. Set DEMO_PASSWORD and retry."
+                )
     processes = Processes()
     try:
         if not args.skip_install:
@@ -386,8 +398,11 @@ def main(argv=None):
                 env=install_env,
                 description="npm ci (existing package-lock.json)",
             )
-        demo_env = child_environment()
-        demo_env["DEMO_PASSWORD"] = password
+        demo = None
+        demo_env = None
+        if not args.no_demo:
+            demo_env = child_environment()
+            demo_env["DEMO_PASSWORD"] = password
         api_env = child_environment(model=not args.no_model)
         api_env.update(TESTPILOT_DATABASE=str(database), DEMO_BASE_URL="http://127.0.0.1:8010")
         configured = bool(
@@ -401,7 +416,8 @@ def main(argv=None):
         frontend_env = child_environment()
         frontend_env["VITE_USE_MOCK"] = "false"
         host = str(ROOT / "scripts/service_host.py")
-        demo = processes.spawn([str(python), host, "demo"], env=demo_env, service=True)
+        if demo_env is not None:
+            demo = processes.spawn([str(python), host, "demo"], env=demo_env, service=True)
         api = processes.spawn([str(python), host, "api"], env=api_env, service=True)
         frontend = processes.spawn(
             [
@@ -419,16 +435,24 @@ def main(argv=None):
             cwd=ROOT / "frontend",
             env=frontend_env,
         )
-        services = [demo, api, frontend]
-        wait_ready(services, "http://127.0.0.1:8010/me", 401, json_body={"code": "UNAUTHORIZED"})
+        services = [api, frontend]
+        if demo is not None:
+            services.insert(0, demo)
+            wait_ready(
+                services, "http://127.0.0.1:8010/me", 401, json_body={"code": "UNAUTHORIZED"}
+            )
         wait_ready(services, "http://127.0.0.1:8000/api/health", 200, json_body={"status": "ok"})
         wait_ready(services, "http://127.0.0.1:5173/projects", 200)
         wait_ready(services, "http://127.0.0.1:5173/api/health", 200, json_body={"status": "ok"})
         say("[READY] frontend: http://127.0.0.1:5173/projects (REAL mode)")
-        say("[READY] API docs: http://127.0.0.1:8000/docs ; demo: http://127.0.0.1:8010")
-        say(
-            "[next] Create a project and requirement; configure demo credentials in the environment page."
-        )
+        if demo is not None:
+            say("[READY] API docs: http://127.0.0.1:8000/docs ; demo: http://127.0.0.1:8010")
+            say(
+                "[next] Create a project and requirement; configure demo credentials in the environment page."
+            )
+        else:
+            say("[READY] API docs: http://127.0.0.1:8000/docs ; demo service skipped")
+            say("[next] Create a project and requirement; set the local service target in the environment page.")
         say(
             "[next] Without a model, save/confirm a manual case, execute it, and download the report."
         )
