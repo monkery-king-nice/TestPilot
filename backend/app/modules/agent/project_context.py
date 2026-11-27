@@ -49,6 +49,7 @@ def project_context(repository, project_id, requirement, endpoints):
                 {**parameter, "description": model_text(parameter["description"])}
                 for parameter in candidate["parameters"][:4]
             ],
+            "request_fields": candidate.get("request_fields", []),
             "responses": [
                 {**response, "description": model_text(response["description"])}
                 for response in candidate["responses"][:4]

@@ -1,0 +1,23 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'"><title>TestPilot 测试报告</title><style>body{font:16px/1.7 system-ui,sans-serif;color:#22352d;max-width:1100px;margin:40px auto;padding:0 24px}h1,h2,h3{line-height:1.4}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #c9d5ce;padding:10px;text-align:left;vertical-align:top}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f5f2;padding:12px;border-radius:6px}section{border-top:2px solid #c9d5ce;padding-top:16px;margin-top:28px}p{overflow-wrap:anywhere}@media print{body{margin:0;max-width:none}section{break-before:auto}}</style></head><body><h1>TestPilot · 测试报告</h1><p>运行批次：fdab88af-1c82-4f8a-88f2-cd473e49ed42<br>项目：2d32a452-1238-42bd-bd82-3f13102b0320<br>批次状态：COMPLETED<br>目标：本地服务 station（http://127.0.0.1:63641） · 环境 v1</p><table><thead><tr><th>用例总数</th><th>PASS 通过</th><th>FAIL 失败</th><th>ERROR 错误</th><th>BLOCKED 阻塞</th></tr></thead><tbody><tr><td>2</td><td>1</td><td>1</td><td>0</td><td>0</td></tr></tbody></table><p>本批通过率：50.0%（PASS / 全部所选用例，分母 2）。统计仅针对本批次，不代表软件整体质量。人工检查记录独立保存，未混入自动执行统计。</p><section><h2>读取摄氏温度</h2><p>用例：4d18d3ce-cd59-4ccb-8732-879938b830f8 · 版本 1<br>确认时间：2026-11-27T14:53:29.264443+00:00<br>结果：<strong>PASS</strong></p><h3>执行时的需求与预期依据</h3><p>需求：ad6776cb-02cf-49ca-ae9a-a999b79753f7 · 版本 2</p><pre>本次只测正常读取。在本机测试环境中，无需登录，使用 GET /reading.json，不传查询参数、请求头或请求体。响应为 HTTP 200，JSON 对象的 unit 字段等于字符串 C。</pre><p>预期依据：本次只测正常读取。在本机测试环境中，无需登录，使用 GET /reading.json，不传查询参数、请求头或请求体。响应为 HTTP 200，JSON 对象的 unit 字段等于字符串 C。</p><h3>步骤 read · test</h3><p>接口：GET /reading.json · 版本 1<br>HTTP 状态：200 · 耗时：213 ms<br>错误阶段：—</p><p>冻结的断言：</p><pre>[
+  {
+    &quot;type&quot;: &quot;status&quot;,
+    &quot;expected&quot;: 200
+  },
+  {
+    &quot;type&quot;: &quot;json_equals&quot;,
+    &quot;path&quot;: &quot;unit&quot;,
+    &quot;expected&quot;: &quot;C&quot;
+  }
+]</pre><p>请求摘要（已脱敏）：</p><pre>GET /reading.json {&quot;headers&quot;: {}, &quot;body&quot;: null}</pre><p>响应摘要（已脱敏）：</p><pre>HTTP 200 {&quot;unit&quot;: &quot;C&quot;, &quot;temperature&quot;: 21}</pre><p>断言差异：</p><pre>[]</pre></section><section><h2>人为改错预期</h2><p>用例：49d3a5bc-eca3-4a31-97d9-eff4847f7747 · 版本 1<br>确认时间：2026-11-27T14:53:29.304828+00:00<br>结果：<strong>FAIL</strong></p><h3>执行时的需求与预期依据</h3><p>需求：ad6776cb-02cf-49ca-ae9a-a999b79753f7 · 版本 2</p><pre>本次只测正常读取。在本机测试环境中，无需登录，使用 GET /reading.json，不传查询参数、请求头或请求体。响应为 HTTP 200，JSON 对象的 unit 字段等于字符串 C。</pre><p>预期依据：本次只测正常读取。在本机测试环境中，无需登录，使用 GET /reading.json，不传查询参数、请求头或请求体。响应为 HTTP 200，JSON 对象的 unit 字段等于字符串 C。</p><h3>步骤 read · test</h3><p>接口：GET /reading.json · 版本 1<br>HTTP 状态：200 · 耗时：13 ms<br>错误阶段：assertion</p><p>冻结的断言：</p><pre>[
+  {
+    &quot;type&quot;: &quot;status&quot;,
+    &quot;expected&quot;: 200
+  },
+  {
+    &quot;type&quot;: &quot;json_equals&quot;,
+    &quot;path&quot;: &quot;unit&quot;,
+    &quot;expected&quot;: &quot;F&quot;
+  }
+]</pre><p>请求摘要（已脱敏）：</p><pre>GET /reading.json {&quot;headers&quot;: {}, &quot;body&quot;: null}</pre><p>响应摘要（已脱敏）：</p><pre>HTTP 200 {&quot;unit&quot;: &quot;C&quot;, &quot;temperature&quot;: 21}</pre><p>断言差异：</p><pre>[
+  &quot;unit：期望 &#x27;F&#x27;，实际 &#x27;C&#x27;&quot;
+]</pre></section><p>本报告读取执行器保存的快照和证据；当前需求与用例的后续修改不会改写本报告。</p></body></html>

@@ -60,11 +60,18 @@ export function getRunDetail(projectId: string, runId: string): Promise<RunDetai
 }
 
 /** 失败分析（用户点击触发，仅分析已保存的脱敏结果） */
-export function getAnalysis(projectId: string, runId: string, caseId: string): Promise<Analysis> {
+export function previewAnalysis(projectId: string, runId: string, caseId: string) {
+  return apiFetch<{ context: unknown; digest: string }>(projectPath(projectId, `/runs/${runId}/analysis/preview`), {
+    method: 'POST',
+    body: JSON.stringify({ case_id: caseId })
+  })
+}
+
+export function getAnalysis(projectId: string, runId: string, caseId: string, digest?: string): Promise<Analysis> {
   if (USE_MOCK) return mockGetAnalysis(projectId, runId, caseId)
   return apiFetch<Analysis>(projectPath(projectId, `/runs/${runId}/analysis`), {
     method: 'POST',
-    body: JSON.stringify({ case_id: caseId })
+    body: JSON.stringify({ case_id: caseId, context_digest: digest })
   })
 }
 

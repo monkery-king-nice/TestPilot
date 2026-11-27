@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   confirmCase, generateCases, listEndpoints, listRequirements, saveCase,
-  type Endpoint, type Requirement,
+  type BasisReview, type Endpoint, type Requirement,
 } from '@/api/authoring'
+import { assertionLabel, inputShape, reviewLabel } from './review.mjs'
+import { confirmModelInput } from './modelConsent'
 import { listCases } from '@/api/runs'
 import type { Case, CaseDraft } from '@/api/types'
 
@@ -15,6 +17,7 @@ const endpoints = ref<Endpoint[]>([])
 const requirementId = ref(String(route.query.requirement ?? ''))
 const cases = ref<Case[]>([])
 const candidates = ref<CaseDraft[]>([])
+const reviews = ref<BasisReview[]>([])
 const editor = ref<CaseDraft | null>(null)
 const editId = ref<string>()
 const stepsText = ref('')
@@ -57,6 +60,11 @@ function openDraft(draft: CaseDraft, id?: string) {
   stepsText.value = JSON.stringify(draft.steps, null, 2)
 }
 
+function endpointLabel(id: string) {
+  const ep = endpoints.value.find(item => item.id === id)
+  return ep ? ep.method + ' ' + ep.path : '请核对接口'
+}
+
 function newDraft() {
   const req = selectedRequirement.value
   if (!req) return
@@ -72,10 +80,14 @@ function newDraft() {
 
 function generate() {
   return perform(async () => {
-    candidates.value = []
     const requirement = selectedRequirement.value
     if (!requirement) return
-    candidates.value = (await generateCases(project, requirement.id, requirement.version)).drafts
+    const digest = await confirmModelInput(project, requirement.id, requirement.version)
+    if (!digest) return
+    candidates.value = []
+    const result = await generateCases(project, requirement.id, requirement.version, digest)
+    candidates.value = result.drafts
+    reviews.value = result.reviews ?? []
     notice.value = '请逐条核对预期，选择候选编辑并保存。'
   })
 }
@@ -139,7 +151,16 @@ function useLatestRequirement() {
       <p v-if="!endpoints.length">请先在需求页登记接口。</p>
       <ul v-if="candidates.length">
         <li v-for="(draft, index) in candidates" :key="index">
-          {{ draft.title }} · {{ draft.steps.length }} 步
+          <strong>{{ draft.title }}</strong> · {{ draft.steps.length }} 个 HTTP 步骤
+          <p>预期依据：{{ draft.expected_basis }}</p>
+          <small>{{ reviewLabel(reviews[index]) }}</small>
+          <ol>
+            <li v-for="(step, s) in draft.steps" :key="s">
+              {{ step.phase === 'setup' ? '准备' : '验证' }} · {{ endpointLabel(step.endpoint_id) }}
+              <div>输入：{{ inputShape(step.body) }}</div>
+              <div v-for="(a, n) in step.assertions" :key="n">{{ assertionLabel(a) }}</div>
+            </li>
+          </ol>
           <el-button link type="primary" :disabled="busy" @click="openDraft(draft)">编辑候选</el-button>
         </li>
       </ul>

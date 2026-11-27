@@ -15,6 +15,8 @@ async function main() {
   })
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } })
   page.setDefaultTimeout(10000)
+  page.on('pageerror', error => console.error('Browser error:', error.message))
+  page.on('console', msg => { if (msg.type() === 'error') console.error(msg.text()) })
   const requests = []
   page.on('request', request => {
     if (request.url().includes('/api/') && request.method() !== 'GET') {
@@ -65,6 +67,9 @@ async function main() {
     assert.equal(await editor().inputValue(), v1.text.replace(/\r\n/g, '\n'))
     const clarifyResponse = page.waitForResponse(response => response.url().endsWith('/agent/clarify'))
     await double('检查缺项')
+    await button('同意发送').waitFor()
+    await page.screenshot({ path: path.join(output, 'beta-consent.png') })
+    await button('同意发送').click()
     assert.equal((await clarifyResponse).status(), 200)
     await page.getByRole('textbox', { name: '补充答案 1', exact: true }).fill('名称为空时返回 422，并说明原因。')
     await button('预览补充').click()
@@ -102,7 +107,9 @@ async function main() {
     await page.getByRole('link', { name: '测试用例', exact: true }).click()
     await button('放弃并离开').click()
     await button('生成候选用例').click()
+    await button('同意发送').click()
     await page.getByText(/接口响应检查（模型替身）/).waitFor()
+    await page.screenshot({ path: path.join(output, 'beta-candidate.png'), fullPage: true })
     const generation = requests.find(request => request.url.endsWith('/agent/generate'))
     assert.equal(generation.body.requirement_version, 2)
     assert.deepEqual(await (await page.request.get(`${base}/api/projects/${book.id}/cases`)).json(), [])
@@ -124,6 +131,7 @@ async function main() {
     await double('登记接口')
     await page.getByText('GET /rooms', { exact: true }).waitFor()
     await button('检查缺项').click()
+    await button('同意发送').click()
     await page.getByRole('textbox', { name: '补充答案 1', exact: true }).fill('旧版本答案，不应覆盖更新')
     const roomApi = `${base}/api/projects/${room.id}/requirements`
     const old = (await (await page.request.get(roomApi)).json())[0]

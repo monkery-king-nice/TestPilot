@@ -13,6 +13,7 @@ export type Clarification = {
 export type ImportCandidate = {
   candidate_id: string; source_path: string; method: string; path: string; summary: string
   requires_manual_registration: boolean
+  request_fields?: { name: string; type: string; required: boolean }[]
   parameters: { name: string; in: string; required: boolean; type?: string; description?: string }[]
   responses: { status: string; description: string }[]
 }
@@ -39,10 +40,13 @@ export const updateRequirement = (p: string, id: string, text: string, expected_
 export const listEndpoints = (p: string) => apiFetch<Endpoint[]>(projectPath(p, '/endpoints'))
 export const createEndpoint = (p: string, method: string, path: string) =>
   apiFetch<Endpoint>(projectPath(p, '/endpoints'), write('POST', { method, path }))
-export const clarifyRequirement = (p: string, requirement_id: string, requirement_version: number) =>
-  apiFetch<Clarification>(projectPath(p, '/agent/clarify'), write('POST', { requirement_id, requirement_version }))
-export const generateCases = (p: string, requirement_id: string, requirement_version: number) =>
-  apiFetch<{ drafts: CaseDraft[] }>(projectPath(p, '/agent/generate'), write('POST', { requirement_id, requirement_version }))
+export const previewModelInput = (p: string, requirement_id: string, requirement_version: number) =>
+  apiFetch<{ context: unknown; digest: string }>(projectPath(p, "/agent/preview"), write("POST", { requirement_id, requirement_version }))
+export const clarifyRequirement = (p: string, requirement_id: string, requirement_version: number, context_digest?: string) =>
+  apiFetch<Clarification>(projectPath(p, '/agent/clarify'), write('POST', { requirement_id, requirement_version, context_digest }))
+export type BasisReview = { source: "requirement" | "document" | "unverified"; exact: boolean; path?: string | null }
+export const generateCases = (p: string, requirement_id: string, requirement_version: number, context_digest?: string) =>
+  apiFetch<{ drafts: CaseDraft[]; reviews?: BasisReview[] }>(projectPath(p, '/agent/generate'), write('POST', { requirement_id, requirement_version, context_digest }))
 export const saveCase = (p: string, draft: CaseDraft, id?: string) =>
   apiFetch<Case>(projectPath(p, id ? '/cases/' + encode(id) : '/cases'), write(id ? 'PATCH' : 'POST', draft))
 export const confirmCase = (p: string, id: string, version: number) =>

@@ -1,0 +1,73 @@
+{
+  "sample": "合成气象站 / Python 标准库 HTTP 服务，无 OpenAPI",
+  "live_model": true,
+  "clarification": {
+    "status": "NEEDS_INFO",
+    "questions": [
+      {
+        "quote": "查询观测站时要显示温度。",
+        "question": "查询一个观测站时，如果这个站当下没有温度数据（比如还没测到、或者数据缺失），你希望页面怎么写？是留空、显示“暂无数据”之类的提示，还是干脆不显示这个站？"
+      },
+      {
+        "quote": "查询观测站时要显示温度。",
+        "question": "温度显示成什么样？只显示一个数字，还是要带单位（比如“23℃”）？如果原始数据精度很高（比如 23.4567℃），要不要四舍五入到整数或一位小数？"
+      }
+    ]
+  },
+  "generation": {
+    "drafts": [
+      {
+        "title": "不带参数请求 /reading.json，验证响应为 200 且 unit 等于 C",
+        "requirement_id": "ad6776cb-02cf-49ca-ae9a-a999b79753f7",
+        "requirement_version": 2,
+        "expected_basis": "响应为 HTTP 200，JSON 对象的 unit 字段等于字符串 C。",
+        "steps": [
+          {
+            "name": "getReading",
+            "phase": "test",
+            "endpoint_id": "bcf044ee-3814-4ba8-bb47-9f1c1d03119b",
+            "endpoint_version": 1,
+            "headers": {},
+            "body": null,
+            "assertions": [
+              {
+                "type": "status",
+                "expected": 200
+              },
+              {
+                "type": "json_equals",
+                "path": "unit",
+                "expected": "C"
+              }
+            ],
+            "extract": {}
+          }
+        ]
+      }
+    ],
+    "reviews": [
+      {
+        "source": "requirement",
+        "exact": true,
+        "path": null
+      }
+    ]
+  },
+  "counts": {
+    "PASS": 1,
+    "FAIL": 1,
+    "ERROR": 0,
+    "BLOCKED": 0
+  },
+  "difference": [
+    "unit：期望 'F'，实际 'C'"
+  ],
+  "analysis": {
+    "category": "断言失败",
+    "reason": "唯一记录的步骤处于断言阶段：read 步骤返回 HTTP 200，但单位断言期望 'F'，实际得到 'C'。因此记录的差异是单位字符不匹配；HTTP 响应本身成功。根据证据无法确定为何返回 'C' 而非 'F'。",
+    "suggestion": "检查单位转换或映射逻辑，并核实 read 测试的夹具/输入预期单位 'F'；修正代码或预期后再重新运行。",
+    "evidence": [
+      "read · HTTP 200 · 阶段 assertion · unit：期望 'F'，实际 'C'"
+    ]
+  }
+}
