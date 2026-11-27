@@ -2,6 +2,8 @@
 
 智测领航：面向基础开发者的智能软件测试平台。当前 main 已接通项目、需求、用例确认、真实执行、HTML 报告和 Agent 接口。
 
+[Beta 冲刺记录与运行证据](docs/beta-sprint-blog.md) · [公开体验样本源文件](docs/public-sample/index.html)
+
 ## Windows 推荐启动（真实模式）
 
 需要 Python 3.11+、Node.js 18+ 和 npm 8+，首次安装依赖需要网络。以下命令在仓库根目录的 PowerShell 运行，无需激活虚拟环境。

@@ -86,10 +86,10 @@ function register() {
     <template #header>项目资料</template>
     <input ref="fileInput" type="file" accept=".zip" hidden @change="upload" />
     <el-button :disabled="disabled || busy" @click="fileInput?.click()">上传项目 ZIP</el-button>
-    <p>支持最多 40 MiB 的 ZIP。上传后选择需求文档，再确认需要登记的接口。</p>
+    <p>可上传需求与接口说明的精简 ZIP（最多 40 MiB），也可直接在下方填写。原包会保存到此实例，请移除密钥与真实用户数据。</p>
     <el-alert v-if="error" :title="error" type="error" :closable="false" show-icon />
     <div v-if="manifest">
-      <p role="status">已上传 {{ manifest.filename }} · {{ manifest.documents.length }} 份可选文档</p>
+      <p role="status">已上传 {{ manifest.filename }} · {{ manifest.documents.length }} 份可选文档 · {{ manifest.endpoint_candidates.length }} 个候选接口 · 本包已确认 {{ manifest.confirmed_endpoints.length }} 个</p>
       <el-alert v-for="warning in manifest.warnings" :key="warning" :title="warning" type="warning" :closable="false" />
       <p v-if="!manifest.documents.length">包内没有可选需求文档，请在下方单独导入 MD/TXT，或手工输入需求。</p>
       <form v-else class="import-controls" @submit.prevent="loadPreview">
@@ -109,7 +109,7 @@ function register() {
         <el-button :disabled="disabled || busy" @click="emit('preview', preview)">作为新需求原文</el-button>
       </div>
       <h3>候选接口</h3>
-      <p v-if="manifest.needs_manual_endpoints">未找到可直接登记的 OpenAPI 接口，请在下方手工登记实际接口。</p>
+      <p v-if="manifest.needs_manual_endpoints">请检查下方候选和解析提示。若项目已有 HTTP 服务，请在下方手工登记实际接口和具体路径；仅有文档也可先保存需求、检查缺项。</p>
       <el-checkbox-group v-model="candidates" aria-label="候选接口" :disabled="disabled || busy">
         <div v-for="candidate in manifest.endpoint_candidates" :key="candidate.candidate_id" class="candidate">
           <el-checkbox :value="candidate.candidate_id" :disabled="candidate.requires_manual_registration || confirmed(candidate.candidate_id)">
@@ -118,6 +118,7 @@ function register() {
           <span v-if="confirmed(candidate.candidate_id)">已登记</span>
           <p>来源 {{ candidate.source_path }}</p>
           <p v-if="candidate.requires_manual_registration">含路径参数，请在下方填写具体路径后手工登记。</p>
+          <p v-if="candidate.request_fields?.length">JSON 输入：{{ candidate.request_fields.map(f => f.name + (f.required ? "（必填）" : "（选填）")).join("、") }}</p>
           <ul v-if="candidate.parameters?.length">
             <li v-for="parameter in candidate.parameters" :key="parameter.in + parameter.name">
               {{ parameter.in }} · {{ parameter.name }} {{ parameter.required ? '必填' : '选填' }} {{ parameter.description }}

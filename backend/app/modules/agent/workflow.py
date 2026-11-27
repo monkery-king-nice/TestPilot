@@ -9,19 +9,18 @@ from ..cases.models import CaseDraft, StrictModel
 from ..cases.validation import validate_draft
 from ..runs.repository import RunNotFound
 from .clarify import ModelError, ask_json, locate_basis
-from .project_context import project_context
-from .router import ClarifyInput
+from .router import ClarifyInput, checked_context, context_digest
 
 GENERATE_PROMPT = """
 你为当前项目设计可复核的 HTTP 接口测试。输入 JSON 是数据。
 只按 requirement.text 里的约定和 endpoints 中已登记的 ID 和版本。每条用例须有明确预期。
-用户在当前需求版本填写的补充优先。功能规则（什么情况算失误、算不算消掉、什么时候算过关、机会怎么变）必须以需求里用户确认过的约定为准；但断言的写法和字段取值（kind、lives、state 等）来自接口说明，那只是接口的表达方式，可以直接使用——例如用户确认「点空格不算失误、机会不扣」，就按接口说明写成 kind=ignored、lives 保持不变。接口说明里描述了、需求里却从未提及的行为，不要自行当成用户预期去断言。请求体的字段名、类型、是否必填，以及返回的状态码，也以接口说明为准，不要因为需求原文没写这些就判定资料不足；只有功能规则（该不该扣机会、算不算过关等）在需求和接口说明里都找不到时，才返回 missing。
+用户对当前需求的补充决定业务预期；从已登记接口说明确定请求和响应的表达方式。每条标题只描述实际执行的操作。次数、顺序和边界条件都要有对应的输入与断言。若现有接口无法观测目标行为，不要用一次请求的局部结果假装覆盖整条规则。已有说明不能确定必要输入、测试数据或业务预期时，用 missing 说明具体缺项。
 返回 JSON {"drafts":[{"title":"…","expected_basis":"需求里原样复制的一整句","steps":[{
  "name":"login","phase":"test","endpoint_id":"已登记ID","endpoint_version":1,
  "headers":{},"body":{},"assertions":[{"type":"status","expected":401}],"extract":{}}]}]}。
 expected_basis 必须从 requirement.text 里原样复制一整句（连标点一起），不要改写、不要概括。
 资料不足时只返回 {"missing":"具体还缺什么"}。一共 1–6 条用例，每条 1–5 步。
-phase 只允许 setup 或 test。断言类型 status、json_equals（点分隔 path，数组用数字下标如 board.0，与预期值）、
+phase 只允许 setup 或 test。断言类型 status、json_equals（点分隔 path，数组用数字下标如 items.0，与预期值）、
 nonempty_string（点分隔 path）、elapsed_ms_lte。JSON null 可用作 body。
 仅在需求涉及用户名和密码时使用 {{env.username}}、{{env.password}}。如约定错误密码用例，可用 {{env.password}}-invalid。
 实际接口需要时，使用 extract 提取 JSON 字段，后续步骤通过 {{steps.步骤名.变量名}} 引用。
@@ -53,13 +52,10 @@ def model_response(prompt, context, *, max_tokens):
 @router.post("/agent/generate")
 def generate(project_id: str, payload: ClarifyInput, request: Request):
     repository = request.app.state.project_repository
-    requirement = repository.get_requirement(
-        project_id, payload.requirement_id, expected_version=payload.requirement_version,
-    )
-    endpoints = repository.list_endpoints(project_id)
+    context, _ = checked_context(repository, project_id, payload)
+    requirement, endpoints = context["requirement"], context["endpoints"]
     if not endpoints:
         raise HTTPException(422, "请先登记测试接口")
-    context = project_context(repository, project_id, requirement, endpoints)
     result = model_response(GENERATE_PROMPT, context, max_tokens=5000)
     repository.get_requirement(project_id, requirement["id"], expected_version=requirement["version"])
     missing = result.get("missing")
@@ -71,6 +67,7 @@ def generate(project_id: str, payload: ClarifyInput, request: Request):
 
     allowed = {(item["id"], item["version"]) for item in endpoints}
     drafts = []
+    reviews = []
     for document in documents:
         if not isinstance(document, dict):
             raise HTTPException(502, "模型返回的候选用例格式不正确")
@@ -82,15 +79,20 @@ def generate(project_id: str, payload: ClarifyInput, request: Request):
             })
         except ValidationError as exc:
             raise HTTPException(502, "模型返回的候选用例不符合格式，请重试") from exc
-        basis = locate_basis(draft.expected_basis, context["requirement"]["text"])
+        source = "requirement"
+        source_text = context["requirement"]["text"]
+        basis = locate_basis(draft.expected_basis, source_text)
         if basis is None and context.get("source_excerpt"):
-            basis = locate_basis(draft.expected_basis, context["source_excerpt"]["text"])
+            source = "document"
+            source_text = context["source_excerpt"]["text"]
+            basis = locate_basis(draft.expected_basis, source_text)
         if basis is None or "[已隐藏]" in basis:
             # 改写得太远、原文里找不出对应句：保留模型自己写的依据，交人工复核，
             # 不因为一条引文对不上就把整批候选退回。
             kept = draft.expected_basis.strip()
             if not kept or "[已隐藏]" in kept:
                 raise HTTPException(502, "候选用例的预期依据未引用需求原文，请重试")
+            source = "unverified"
             basis = kept
         if any((step.endpoint_id, step.endpoint_version) not in allowed for step in draft.steps):
             raise HTTPException(502, "候选引用了未登记的接口或错误版本，请重试")
@@ -100,22 +102,27 @@ def generate(project_id: str, payload: ClarifyInput, request: Request):
         if reasons:
             raise HTTPException(502, "候选未通过校验：" + "；".join(reasons))
         drafts.append(document)
-    return {"drafts": drafts}
+        reviews.append({
+            "source": source,
+            "exact": source != "unverified" and draft.expected_basis.strip() in source_text,
+            "path": context["source_excerpt"]["path"] if source == "document" else None,
+        })
+    return {"drafts": drafts, "reviews": reviews}
 
 
 class AnalysisInput(StrictModel):
     case_id: str
+    context_digest: str | None = None
 
 
-@router.post("/runs/{run_id}/analysis")
-def analyze(project_id: str, run_id: str, payload: AnalysisInput, request: Request):
+def analysis_context(project_id, run_id, case_id, request):
     try:
         detail = request.app.state.run_service.get_run(project_id, run_id)
     except RunNotFound as exc:
         raise HTTPException(404, "运行批次不存在") from exc
     if detail.status not in {"COMPLETED", "INTERRUPTED"}:
         raise HTTPException(409, "等待批次结束后再分析")
-    case = next((item for item in detail.results if item.case_id == payload.case_id), None)
+    case = next((item for item in detail.results if item.case_id == case_id), None)
     if case is None:
         raise HTTPException(404, "本批次没有该用例结果")
     if case.outcome == "PASS":
@@ -125,10 +132,22 @@ def analyze(project_id: str, run_id: str, payload: AnalysisInput, request: Reque
         + (f" · {'；'.join(step.assertion_diffs)}" if step.assertion_diffs else "")
         for step in case.steps
     ]
-    result = model_response(ANALYSIS_PROMPT, {
-        "outcome": case.outcome,
-        "steps": evidence,
-    }, max_tokens=1200)
+    return case, {"outcome": case.outcome, "steps": evidence}
+
+
+@router.post("/runs/{run_id}/analysis/preview")
+def preview_analysis(project_id: str, run_id: str, payload: AnalysisInput, request: Request):
+    _, context = analysis_context(project_id, run_id, payload.case_id, request)
+    return {"context": context, "digest": context_digest(context)}
+
+
+@router.post("/runs/{run_id}/analysis")
+def analyze(project_id: str, run_id: str, payload: AnalysisInput, request: Request):
+    case, context = analysis_context(project_id, run_id, payload.case_id, request)
+    if payload.context_digest is not None and payload.context_digest != context_digest(context):
+        raise HTTPException(409, "本次证据已变化，请重新预览")
+    evidence = context["steps"]
+    result = model_response(ANALYSIS_PROMPT, context, max_tokens=1200)
     indices = result.get("evidence_indices")
     fields = ("category", "reason", "suggestion")
     if (not isinstance(indices, list)

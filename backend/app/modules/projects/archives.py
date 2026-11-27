@@ -155,6 +155,24 @@ def parameter_notes(spec: dict, path_item: dict, operation: dict) -> list[dict]:
     return list(parameters.values())[:32]
 
 
+def request_fields(spec: dict, operation: dict) -> list[dict]:
+    """List only JSON property names and types. Keep examples and defaults private."""
+    body = resolve_component(spec, operation.get("requestBody"), "requestBodies")
+    media = as_object(as_object(body.get("content")).get("application/json"))
+    schema = resolve_component(spec, media.get("schema"), "schemas")
+    required = schema.get("required")
+    fields = []
+    for name, definition in as_object(schema.get("properties")).items():
+        definition = resolve_component(spec, definition, "schemas")
+        fields.append({
+            "name": snippet(name), "type": snippet(definition.get("type")),
+            "required": isinstance(required, list) and name in required,
+        })
+        if len(fields) == 32:
+            break
+    return fields
+
+
 def response_notes(spec: dict, operation: dict) -> list[dict]:
     return [
         {
@@ -198,6 +216,7 @@ def extract_candidates(spec: dict, source: str, candidates: list[dict]) -> bool:
                     "summary": snippet(operation.get("summary"))
                     or snippet(operation.get("description")),
                     "parameters": parameter_notes(spec, item, operation),
+                    "request_fields": request_fields(spec, operation),
                     "responses": response_notes(spec, operation),
                 }
             )

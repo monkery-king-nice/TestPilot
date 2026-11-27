@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智测领航 · HTTP 测试体验</title>
+<style>*{box-sizing:border-box}body{margin:auto;padding:9vh 24px;max-width:760px;background:#fbfaf6;color:#20372d;font:18px/1.6 system-ui,sans-serif}h1{font-size:clamp(30px,6vw,52px);line-height:1.1}label,button{display:block}select,button{padding:10px 18px;font:inherit}button{margin:18px 0;background:#225944;color:white;border:none;border-radius:5px;cursor:pointer}pre{white-space:pre-wrap;background:#e9efea;padding:18px}a{color:#145f49}</style>
+<h1>观测站的温度单位对吗？</h1>
+<p>选择一个预期单位，浏览器会向本站的公开观测站样本发送一次 GET 请求，核对响应里的 <code>unit</code>。两次选择不同的单位，比较报告中的预期与实际。</p>
+<label for="unit">预期单位</label><select id="unit"><option value="C">摄氏度（C）</option><option value="F">华氏度（F）</option></select>
+<button id="run">执行这条测试</button><pre aria-live="polite" id="result">等待执行</pre>
+<p>此页面使用公开教学数据。要导入自己的 ZIP、调用模型或测试本机服务，请下载并在自己的电脑运行完整版。<a href="https://github.com/monkery-king-nice/TestPilot">本地版与启动说明</a></p>
+<script type="module">
+const run = document.querySelector('#run'), result = document.querySelector('#result')
+run.addEventListener('click', async () => {
+  run.disabled = true
+  const expected = document.querySelector('#unit').value
+  try {
+    const response = await fetch('./reading.json', {cache:'no-store'})
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    const body = await response.json()
+    result.textContent = [body.unit === expected ? 'PASS · 通过' : 'FAIL · 断言不符',
+      'GET reading.json · HTTP ' + response.status, '预期单位 ' + expected,
+      '实际单位 ' + body.unit, '服务响应 ' + JSON.stringify(body)].join('\n')
+  } catch (error) { result.textContent = 'ERROR · 无法读取样本响应\n' + error.message }
+  finally { run.disabled = false }
+})
+</script></html>

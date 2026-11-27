@@ -77,7 +77,12 @@ def test_analysis_uses_only_selected_case_evidence(tmp_path, monkeypatch):
         app.state.run_service = SimpleNamespace(get_run=lambda _p, _r: sample)
         try:
             route = "/api/projects/p/runs/existing/analysis"
-            response = client.post(route, json={"case_id": "c1"})
+            payload = {"case_id": "c1"}
+            preview = client.post(route + "/preview", json=payload).json()
+            assert preview["context"]["outcome"] == "FAIL"
+            assert "not needed" not in str(preview)
+            assert client.post(route, json={**payload, "context_digest": "outdated"}).status_code == 409
+            response = client.post(route, json={**payload, "context_digest": preview["digest"]})
             assert response.status_code == 200
             assert "预期 401，实际 200" in response.json()["evidence"][0]
             assert client.post(route, json={"case_id": "missing"}).status_code == 404

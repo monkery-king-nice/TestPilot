@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { confirmModelInput } from './modelConsent'
 import { HttpError } from '@/api/client'
 import { readRequirementFile } from './requirementFile'
 import { composeSupplement } from './requirementAnswers'
@@ -197,8 +198,11 @@ function saveSupplement() {
 function clarify() {
   return perform(async () => {
     if (answers.value.some(answer => answer.trim()) && !await canReplace()) return
+    const version = saved.value!.version
+    const digest = await confirmModelInput(project, selected.value, version)
+    if (!digest) return
     clarification.value = null
-    const result = await clarifyRequirement(project, selected.value, saved.value!.version)
+    const result = await clarifyRequirement(project, selected.value, version, digest)
     clarification.value = result
     clarificationVersion.value = saved.value!.version
     answers.value = result.questions.map(() => '')
